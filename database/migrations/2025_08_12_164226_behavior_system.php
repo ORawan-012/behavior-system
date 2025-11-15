@@ -82,7 +82,7 @@ return new class extends Migration
             $table->foreign('assigned_class_id')->references('classes_id')->on('tb_classes')->onDelete('set null');
         });
 
-        // Students (with final status values)
+        // Students (with final status values including 'transferred')
         Schema::create('tb_students', function (Blueprint $table) {
             $table->bigInteger('students_id')->primary()->autoIncrement();
             $table->bigInteger('user_id');
@@ -90,7 +90,7 @@ return new class extends Migration
             $table->bigInteger('class_id')->nullable();
             $table->string('students_academic_year', 10)->nullable();
             $table->integer('students_current_score')->nullable();
-            $table->enum('students_status', ['active', 'suspended', 'expelled', 'graduate'])->nullable();
+            $table->enum('students_status', ['active', 'suspended', 'expelled', 'graduate', 'transferred'])->nullable();
             $table->enum('students_gender', ['male', 'female', 'other'])->nullable();
             $table->timestamp('students_created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();

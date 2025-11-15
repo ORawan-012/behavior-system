@@ -3,6 +3,14 @@
  * ใช้งานกับ Sidebar: archivedStudentsSidebar, studentHistorySidebar
  */
 
+// ใช้ URL จาก server ถ้ามี เพื่อหลีกเลี่ยงการ hard-code path
+const ARCHIVED_STUDENTS_API_URL = (typeof window !== 'undefined' && window.ARCHIVED_STUDENTS_API_URL)
+    ? window.ARCHIVED_STUDENTS_API_URL
+    : '/api/teacher/archived-students';
+const STUDENT_HISTORY_API_BASE = (typeof window !== 'undefined' && window.STUDENT_HISTORY_API_BASE)
+    ? window.STUDENT_HISTORY_API_BASE
+    : '/api/teacher/student-history';
+
 // ตัวแปรสำหรับเก็บข้อมูลและสถานะ
 let archivedStudentsData = {
     students: [],
@@ -24,13 +32,13 @@ let archivedStudentsData = {
  */
 function openArchivedStudentsSidebar() {
     const sidebar = document.getElementById('archivedStudentsSidebar');
-    sidebar.classList.add('show');
-    
-    // โหลดข้อมูลเริ่มต้น
-    loadArchivedStudents();
-    
+    if (sidebar) {
+        sidebar.classList.add('show');
+        // โหลดข้อมูลเริ่มต้น
+        loadArchivedStudents();
+    }
     // ป้องกันการ scroll ของ body
-    document.body.style.overflow = 'hidden';
+    if (document && document.body) document.body.style.overflow = 'hidden';
 }
 
 /**
@@ -38,10 +46,9 @@ function openArchivedStudentsSidebar() {
  */
 function closeArchivedStudentsSidebar() {
     const sidebar = document.getElementById('archivedStudentsSidebar');
-    sidebar.classList.remove('show');
-    
+    if (sidebar) sidebar.classList.remove('show');
     // คืนค่าการ scroll ของ body
-    document.body.style.overflow = '';
+    if (document && document.body) document.body.style.overflow = '';
 }
 
 /**
@@ -49,8 +56,7 @@ function closeArchivedStudentsSidebar() {
  */
 function openStudentHistorySidebar(studentId, studentName) {
     const sidebar = document.getElementById('studentHistorySidebar');
-    sidebar.classList.add('show');
-    
+    if (sidebar) sidebar.classList.add('show');
     // โหลดข้อมูลประวัติ
     loadStudentHistory(studentId, studentName);
 }
@@ -60,7 +66,7 @@ function openStudentHistorySidebar(studentId, studentName) {
  */
 function closeStudentHistorySidebar() {
     const sidebar = document.getElementById('studentHistorySidebar');
-    sidebar.classList.remove('show');
+    if (sidebar) sidebar.classList.remove('show');
 }
 
 /**
@@ -74,17 +80,18 @@ function backToArchivedStudents() {
 /**
  * ฟังก์ชันค้นหานักเรียนตามตัวกรอง
  */
-function searchArchivedStudents() {
-    // อัปเดตตัวกรองจากฟอร์ม
-    archivedStudentsData.filters = {
-        status: document.getElementById('statusFilter').value,
-        level: document.getElementById('levelFilter').value,
-        room: document.getElementById('roomFilter').value,
-        score: document.getElementById('scoreFilter').value,
-        search: document.getElementById('searchInput').value.trim()
-    };
+function _getEl(id){ return document.getElementById(id); }
+function _getVal(id){ const el = _getEl(id); return el ? (el.value || '').trim() : ''; }
 
-    // รีเซ็ตหน้าและโหลดข้อมูล
+function searchArchivedStudents() {
+    // อัปเดตตัวกรองจากฟอร์มอย่างปลอดภัย (ใช้ prefix archived เพื่อเลี่ยงชนกับ admin user management)
+    archivedStudentsData.filters = {
+        status: _getVal('archivedStatusFilter'),
+        level: _getVal('archivedLevelFilter'),
+        room: _getVal('archivedRoomFilter'),
+        score: _getVal('archivedScoreFilter'),
+        search: _getVal('archivedSearchInput')
+    };
     archivedStudentsData.currentPage = 1;
     loadArchivedStudents();
 }
@@ -93,17 +100,9 @@ function searchArchivedStudents() {
  * ฟังก์ชันล้างตัวกรอง
  */
 function clearFilters() {
-    // ล้างค่าในฟอร์ม
-    document.getElementById('statusFilter').value = '';
-    document.getElementById('levelFilter').value = '';
-    document.getElementById('roomFilter').value = '';
-    document.getElementById('scoreFilter').value = '';
-    document.getElementById('searchInput').value = '';
-
-    // ล้างตัวกรองและโหลดข้อมูลใหม่
-    archivedStudentsData.filters = {
-        status: '', level: '', room: '', score: '', search: ''
-    };
+    const ids = ['archivedStatusFilter','archivedLevelFilter','archivedRoomFilter','archivedScoreFilter','archivedSearchInput'];
+    ids.forEach(id => { const el = _getEl(id); if (el) el.value = ''; });
+    archivedStudentsData.filters = { status: '', level: '', room: '', score: '', search: '' };
     archivedStudentsData.currentPage = 1;
     loadArchivedStudents();
 }
@@ -134,7 +133,7 @@ function loadArchivedStudents(page = 1) {
         }
     }
 
-    fetch(`/api/teacher/archived-students?${params}`, {
+    fetch(`${ARCHIVED_STUDENTS_API_URL}?${params}`, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
@@ -273,6 +272,7 @@ function getScoreClass(score) {
  */
 function getStatusBadgeClass(status) {
     switch (status) {
+        case 'graduate':
         case 'graduated': 
         case 'จบการศึกษา': 
             return 'bg-success';
@@ -391,7 +391,7 @@ function loadStudentHistory(studentId, studentName) {
     // แสดง loading state
     showHistoryLoading();
 
-    fetch(`/api/teacher/student-history/${studentId}`, {
+    fetch(`${STUDENT_HISTORY_API_BASE}/${studentId}`, {
         method: 'GET',
         headers: {
             'Accept': 'application/json',
@@ -602,47 +602,43 @@ function exportArchivedData() {
 
 // เพิ่ม Event Listeners เมื่อหน้าโหลดเสร็จ
 document.addEventListener('DOMContentLoaded', function() {
-    // ปิด sidebar เมื่อคลิกที่ overlay
-    document.getElementById('archivedStudentsSidebar').addEventListener('click', function(e) {
-        if (e.target === this) {
-            closeArchivedStudentsSidebar();
-        }
-    });
-    
-    document.getElementById('studentHistorySidebar').addEventListener('click', function(e) {
-        if (e.target === this) {
-            closeStudentHistorySidebar();
-        }
-    });
+    // ปิด sidebar เมื่อคลิกที่ overlay (ตรวจสอบ element ก่อน)
+    const archivedSidebar = document.getElementById('archivedStudentsSidebar');
+    if (archivedSidebar) {
+        archivedSidebar.addEventListener('click', function(e) {
+            if (e.target === this) closeArchivedStudentsSidebar();
+        });
+    }
+    const historySidebar = document.getElementById('studentHistorySidebar');
+    if (historySidebar) {
+        historySidebar.addEventListener('click', function(e) {
+            if (e.target === this) closeStudentHistorySidebar();
+        });
+    }
     
     // ป้องกันการปิด sidebar เมื่อคลิกใน content
     document.querySelectorAll('.sidebar-content').forEach(content => {
-        content.addEventListener('click', function(e) {
-            e.stopPropagation();
-        });
+        content.addEventListener('click', function(e) { e.stopPropagation(); });
     });
     
     // ปิด sidebar เมื่อกด ESC
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
-            const archivedSidebar = document.getElementById('archivedStudentsSidebar');
-            const historySidebar = document.getElementById('studentHistorySidebar');
-            
-            if (historySidebar.classList.contains('show')) {
+            const archivedEl = document.getElementById('archivedStudentsSidebar');
+            const historyEl = document.getElementById('studentHistorySidebar');
+            if (historyEl && historyEl.classList.contains('show')) {
                 closeStudentHistorySidebar();
-            } else if (archivedSidebar.classList.contains('show')) {
+            } else if (archivedEl && archivedEl.classList.contains('show')) {
                 closeArchivedStudentsSidebar();
             }
         }
     });
     
     // เพิ่ม event listener สำหรับ search input
-    const searchInput = document.getElementById('searchInput');
+    const searchInput = document.getElementById('archivedSearchInput');
     if (searchInput) {
         searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                searchArchivedStudents();
-            }
+            if (e.key === 'Enter') searchArchivedStudents();
         });
     }
 });

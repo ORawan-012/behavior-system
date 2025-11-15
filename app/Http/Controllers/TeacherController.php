@@ -124,7 +124,12 @@ class TeacherController extends Controller
 
             // Apply filters
             if ($request->filled('status')) {
-                $query->where('s.students_status', $request->status);
+                $normalizedStatus = $this->normalizeStatusInput($request->status);
+                if (is_array($normalizedStatus)) {
+                    $query->whereIn('s.students_status', $normalizedStatus);
+                } else {
+                    $query->where('s.students_status', $normalizedStatus);
+                }
             }
 
             if ($request->filled('level')) {
@@ -324,6 +329,7 @@ class TeacherController extends Controller
     private function getStatusLabel($status)
     {
         $statusLabels = [
+            'graduate' => 'จบการศึกษา',
             'graduated' => 'จบการศึกษา',
             'transferred' => 'ย้ายโรงเรียน',
             'suspended' => 'พักการเรียน',
@@ -331,5 +337,22 @@ class TeacherController extends Controller
         ];
 
         return $statusLabels[$status] ?? $status;
+    }
+
+    /**
+     * ทำให้ค่าพารามิเตอร์สถานะจาก client เป็นรูปแบบที่ตรงกับฐานข้อมูล
+     */
+    private function normalizeStatusInput($status)
+    {
+        if (!$status) return $status;
+        $map = [
+            'graduated' => 'graduate',
+            'graduate' => 'graduate',
+            'expelled' => 'expelled',
+            'suspended' => 'suspended',
+            'transferred' => 'transferred',
+        ];
+        $key = strtolower(trim($status));
+        return $map[$key] ?? $key;
     }
 }

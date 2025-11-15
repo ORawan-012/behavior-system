@@ -3769,6 +3769,12 @@ document.addEventListener('DOMContentLoaded', function () {
     <script src="/js/student-filter.js?v={{ filemtime(public_path('js/student-filter.js')) }}"></script>
     <script src="/js/parent-notification.js"></script>
     <!-- Archived Students JS -->
+    <script>
+        // Inject canonical API URLs from server-side routes to avoid hard-coded paths
+        window.ARCHIVED_STUDENTS_API_URL = "{{ route('api.teacher.archived-students') }}";
+        // Base URL for student history; JS will append the studentId
+        window.STUDENT_HISTORY_API_BASE = "{{ url('/api/teacher/student-history') }}";
+    </script>
     <script src="/js/archived-students.js"></script>
     <!-- User Management JS (Admin only) -->
     @if(auth()->user()->users_role === 'admin')
@@ -3800,18 +3806,18 @@ document.addEventListener('DOMContentLoaded', function () {
                     </h6>
                     <div class="row g-2 mb-2">
                         <div class="col-md-6">
-                            <label for="statusFilter" class="form-label">สถานะ</label>
-                            <select id="statusFilter" class="form-select form-select-sm">
+                            <label for="archivedStatusFilter" class="form-label">สถานะ</label>
+                            <select id="archivedStatusFilter" class="form-select form-select-sm">
                                 <option value="">ทั้งหมด</option>
-                                <option value="graduated">จบการศึกษา</option>
+                                <option value="graduate">จบการศึกษา</option>
                                 <option value="transferred">ย้ายโรงเรียน</option>
                                 <option value="suspended">พักการเรียน</option>
                                 <option value="expelled">ถูกไล่ออก</option>
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label for="levelFilter" class="form-label">ชั้น</label>
-                            <select id="levelFilter" class="form-select form-select-sm">
+                            <label for="archivedLevelFilter" class="form-label">ชั้น</label>
+                            <select id="archivedLevelFilter" class="form-select form-select-sm">
                                 <option value="">ทั้งหมด</option>
                                 <option value="ม.1">ม.1</option>
                                 <option value="ม.2">ม.2</option>
@@ -3822,8 +3828,8 @@ document.addEventListener('DOMContentLoaded', function () {
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label for="roomFilter" class="form-label">ห้อง</label>
-                            <select id="roomFilter" class="form-select form-select-sm">
+                            <label for="archivedRoomFilter" class="form-label">ห้อง</label>
+                            <select id="archivedRoomFilter" class="form-select form-select-sm">
                                 <option value="">ทั้งหมด</option>
                                 <option value="1">1</option>
                                 <option value="2">2</option>
@@ -3843,8 +3849,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     <div class="row g-2 mb-3">
                         <div class="col-md-4">
-                            <label for="scoreFilter" class="form-label">คะแนน</label>
-                            <select id="scoreFilter" class="form-select form-select-sm">
+                            <label for="archivedScoreFilter" class="form-label">คะแนน</label>
+                            <select id="archivedScoreFilter" class="form-select form-select-sm">
                                 <option value="">ทั้งหมด</option>
                                 <option value="90-100">90-100 คะแนน</option>
                                 <option value="75-89">75-89 คะแนน</option>
@@ -3853,9 +3859,9 @@ document.addEventListener('DOMContentLoaded', function () {
                             </select>
                         </div>
                         <div class="col-md-8">
-                            <label for="searchInput" class="form-label">ค้นหา</label>
+                            <label for="archivedSearchInput" class="form-label">ค้นหา</label>
                             <div class="input-group">
-                                <input type="text" id="searchInput" class="form-control form-control-sm"
+                                <input type="text" id="archivedSearchInput" class="form-control form-control-sm"
                                     placeholder="รหัสนักเรียนหรือชื่อ...">
                                 <button class="btn btn-primary-app btn-sm" type="button"
                                     onclick="searchArchivedStudents()">
