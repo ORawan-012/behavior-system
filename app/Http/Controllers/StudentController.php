@@ -54,6 +54,7 @@ class StudentController extends Controller
                     'class_id' => 1,
                     'students_student_code' => 'STD001',
                     'students_current_score' => 100,
+                    'students_status' => 'active',
                     'classes_level' => 'ม.',
                     'classes_room_number' => '4/1',
                     'classes_academic_year' => '2567',
@@ -68,7 +69,9 @@ class StudentController extends Controller
             // จัดเตรียมข้อมูลสำหรับ Dashboard
             $data = [
                 'user' => $user,
+                // keep existing `student` for template compatibility and add a distinct key
                 'student' => $student,
+                'current_student' => $student,
                 'stats' => [
                     'current_score' => $student->students_current_score ?? 100,
                     'class_rank' => $this->getStudentRank($student->students_id, $student->class_id),
@@ -96,9 +99,11 @@ class StudentController extends Controller
             Log::error('Stack trace: ' . $e->getTraceAsString());
             
             // Return view with minimal data to prevent white screen
+            // Provide a safe `current_student` with default active status to avoid client-side errors
             return view('student.dashboard', [
                 'user' => Auth::user(),
                 'student' => null,
+                'current_student' => (object)['students_status' => 'active'],
                 'stats' => [
                     'current_score' => 100,
                     'class_rank' => 1,

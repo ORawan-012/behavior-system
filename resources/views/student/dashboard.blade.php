@@ -584,5 +584,94 @@
             'colors' => ['#e9ecef']
         ]);
     </script>
+
+    <!-- Hidden logout form for client-side logout submission -->
+    <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display:none;">
+        @csrf
+    </form>
+
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        (function() {
+            // Debug: แสดงข้อมูล `current_student` (จาก controller) เพื่อยืนยันว่าตัวแปรถูกส่งมาจากเซิร์ฟเวอร์
+            // ใช้ `current_student` ถ้ามี เพราะบางส่วนของ view อาจใช้ตัวแปรชื่อ `student` ในลูป (shadowing)
+            console.log('dashboard: blade student ->', @json(($current_student ?? $student) ?? null));
+
+            // รับค่าสถานะจากตัวแปร Blade (รองรับทั้ง array / object / null) โดยใช้ data_get
+            var rawStatus = @json(data_get(($current_student ?? $student), 'students_status', null));
+
+            // แสดงค่าใน console เพื่อตรวจสอบ (ช่วย debug ได้)
+            console.log('dashboard: raw student status ->', rawStatus);
+
+            if (!rawStatus) return;
+
+            // Normalize: trim + lowercase เพื่อป้องกันช่องว่างหรือตัวพิมพ์ใหญ่/เล็ก
+            var studentStatus = String(rawStatus).trim().toLowerCase();
+            console.log('dashboard: normalized studentStatus ->', studentStatus);
+
+            if (studentStatus === 'active') return; // ปกติ ให้เข้าต่อ
+
+            var title = '';
+            var text = '';
+            var icon = 'warning';
+
+            switch (studentStatus) {
+                case 'suspended':
+                    title = 'พักการเรียน';
+                    text = 'บัญชีของคุณถูกพักการเรียน ไม่สามารถใช้งานหน้านี้ได้ชั่วคราว โปรดติดต่อครูประจำชั้นหรือผู้ดูแลระบบเพื่อตรวจสอบข้อมูล';
+                    icon = 'warning';
+                    break;
+                case 'expelled':
+                    title = 'พ้นสภาพนักเรียน';
+                    text = 'บัญชีของคุณไม่ได้เป็นนักเรียนในระบบอีกต่อไป (พ้นสภาพหรือลาออก) หากมีข้อสงสัยกรุณาติดต่อโรงเรียน';
+                    icon = 'error';
+                    break;
+                case 'graduate':
+                    title = 'จบการศึกษา';
+                    text = 'ยินดีด้วย คุณได้จบการศึกษาแล้ว ระบบจะออกจากระบบเพื่อความปลอดภัย';
+                    icon = 'success';
+                    break;
+                case 'transferred':
+                    title = 'ย้ายสถานศึกษา';
+                    text = 'บัญชีของคุณถูกบันทึกว่าที่ย้ายไปยังสถานศึกษาอื่น จึงไม่สามารถใช้งานระบบนี้ได้';
+                    icon = 'info';
+                    break;
+                default:
+                    title = 'สถานะบัญชีไม่ปกติ';
+                    text = 'สถานะบัญชีของคุณไม่อนุญาตให้เข้าถึงส่วนนี้ โปรดติดต่อผู้ดูแลระบบ';
+                    icon = 'warning';
+            }
+
+            function showAndRedirect() {
+                Swal.fire({
+                    title: title,
+                    text: text,
+                    icon: icon,
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    confirmButtonText: 'ตกลง'
+                }).then(function() {
+                    // Submit the logout form to ensure the user is logged out server-side
+                    var f = document.getElementById('logout-form');
+                    if (f) {
+                        f.submit();
+                    } else {
+                        // Fallback: go to login page
+                        window.location.href = "{{ route('login') }}";
+                    }
+                });
+            }
+
+            // ถ้า DOM ยังโหลดไม่เสร็จ ให้รันหลัง DOMContentLoaded
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', showAndRedirect);
+            } else {
+                // ถ้าโหลดแล้ว ให้รันทันที
+                showAndRedirect();
+            }
+        })();
+    </script>
 </body>
 </html>
