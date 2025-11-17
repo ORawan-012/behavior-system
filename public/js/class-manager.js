@@ -171,26 +171,44 @@
 
     function renderStudents(items){
       if(!dStudentsBody) return;
-      if(!items.length){ dStudentsBody.innerHTML='<tr><td colspan="6" class="text-center text-muted py-4">ไม่มีนักเรียน</td></tr>'; return; }
-      dStudentsBody.innerHTML = items.map(function(st,idx){
-        var code=escapeHtml(st.students_student_code||'-');
-        var first=escapeHtml(st.user && st.user.users_first_name ? st.user.users_first_name : '');
-        var last=escapeHtml(st.user && st.user.users_last_name ? st.user.users_last_name : '');
-        var score=Number(st.students_current_score||0);
-        var studentId = st.students_id || st.id;
-        return '<tr>\
-          <td>'+ (idx+1) +'</td>\
-          <td>'+ code +'</td>\
-          <td class="text-center">'+ first + ' ' + last +'</td>\
-          <td>'+ score +'</td>\
-          <td>\
-            <div class="btn-group btn-group-sm">\
-              <button class="btn btn-outline-primary view-student-btn" data-student-id="'+studentId+'" title="ดู"><i class="fas fa-eye"></i></button>\
-              <button class="btn btn-outline-warning edit-student-btn" data-student-id="'+studentId+'" title="แก้ไข"><i class="fas fa-edit"></i></button>\
-            </div>\
-          </td>\
-        </tr>';
-      }).join('');
+        // กรองตามบทบาท: ถ้าไม่ใช่ admin ให้แสดงเฉพาะ active หรือ suspended
+        var role = (window.authRole || '').toLowerCase();
+        var visible = (role === 'admin') ? items : items.filter(function(st){
+          return ['active','suspended'].includes((st.students_status||'').toLowerCase());
+        });
+        if(!visible.length){ dStudentsBody.innerHTML='<tr><td colspan="6" class="text-center text-muted py-4">ไม่มีนักเรียน</td></tr>'; return; }
+        var statusLabels = {
+          'active': 'กำลังศึกษา',
+          'suspended': 'พักการเรียน',
+          'expelled': 'พ้นสภาพ/ลาออก',
+          'transferred': 'ย้ายสถานศึกษา',
+          'graduate': 'จบการศึกษา'
+        };
+        dStudentsBody.innerHTML = visible.map(function(st,idx){
+          var code=escapeHtml(st.students_student_code||'-');
+          var first=escapeHtml(st.user && st.user.users_first_name ? st.user.users_first_name : '');
+          var last=escapeHtml(st.user && st.user.users_last_name ? st.user.users_last_name : '');
+          var score=Number(st.students_current_score||0);
+          var studentId = st.students_id || st.id;
+          var status=(st.students_status||'').toLowerCase();
+          var nameHtml = first + ' ' + last;
+          // ถ้าเป็น admin และสถานะไม่ใช่ active หรือ suspended ให้ไฮไลท์เป็นสีแดงและโชว์ badge สถานะ
+          if(role === 'admin' && !['active','suspended'].includes(status)){
+            nameHtml = '<span class="text-danger fw-semibold">'+nameHtml+'</span> <span class="badge bg-danger ms-1">'+(statusLabels[status]||status)+'</span>';
+          }
+          return '<tr>\
+            <td>'+ (idx+1) +'</td>\
+            <td>'+ code +'</td>\
+            <td class="text-center">'+ nameHtml +'</td>\
+            <td>'+ score +'</td>\
+            <td>\
+              <div class="btn-group btn-group-sm">\
+                <button class="btn btn-outline-primary view-student-btn" data-student-id="'+studentId+'" title="ดู"><i class="fas fa-eye"></i></button>\
+                <button class="btn btn-outline-warning edit-student-btn" data-student-id="'+studentId+'" title="แก้ไข"><i class="fas fa-edit"></i></button>\
+              </div>\
+            </td>\
+          </tr>';
+        }).join('');
       attachStudentHandlers();
     }
 
@@ -362,7 +380,13 @@
       
       el=document.getElementById('se-status-readonly'); 
       if(el) {
-        var statusText = {'active': 'ศึกษาอยู่', 'suspended': 'พักการเรียน', 'expelled': 'ย้ายสถานศึกษา', 'graduate': 'จบการศึกษา'};
+        var statusText = {
+          'active': 'ศึกษาอยู่',
+          'suspended': 'พักการเรียน',
+          'expelled': 'พ้นสภาพ/ลาออก',
+          'transferred': 'ย้ายสถานศึกษา',
+          'graduate': 'จบการศึกษา'
+        };
         el.value = statusText[student.students_status] || 'ศึกษาอยู่';
       }
     }

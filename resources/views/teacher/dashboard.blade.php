@@ -3123,7 +3123,8 @@ document.addEventListener('DOMContentLoaded', function () {
                             <select class="form-select" id="se-status" name="students_status">
                                 <option value="active">ศึกษาอยู่</option>
                                 <option value="suspended">พักการเรียน</option>
-                                <option value="expelled">ย้ายสถานศึกษา</option>
+                                <option value="expelled">พ้นสภาพ/ลาออก</option>
+                                <option value="transferred">ย้ายสถานศึกษา</option>
                                 <option value="graduate">จบการศึกษา</option>
                             </select>
                         </div>
@@ -3588,6 +3589,10 @@ document.addEventListener('DOMContentLoaded', function () {
     <script src="/js/teacher-dashboard.js"></script>
     <script src="/js/violation-manager.js?v={{ filemtime(public_path('js/violation-manager.js')) }}"></script>
     <script src="/js/class-manager.js?v={{ filemtime(public_path('js/class-manager.js')) }}"></script>
+    <script>
+        // เพิ่มตัวแปรบทบาทผู้ใช้สำหรับใช้ใน JS อื่นๆ
+        window.authRole = '{{ auth()->user()->users_role }}';
+    </script>
     <!-- Risk Students Report Modal -->
     <div class="modal fade" id="riskStudentsReportModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
