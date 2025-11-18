@@ -668,7 +668,7 @@
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', showAndRedirect);
             } else {
-                // ถ้าโหลดแล้ว ให้รันทันที
+                // ถ้าโหลดแล้ว ให้รันทันที.
                 showAndRedirect();
             }
         })();
