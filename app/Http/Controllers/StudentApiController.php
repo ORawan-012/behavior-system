@@ -167,7 +167,7 @@ class StudentApiController extends Controller
             
             // Add status validation only for admin
             if ($user->users_role === 'admin') {
-                $validationRules['students_status'] = 'nullable|in:active,suspended,expelled,graduate';
+                $validationRules['students_status'] = 'nullable|in:active,suspended,expelled,graduate,transferred';
             }
             
             $request->validate($validationRules);
