@@ -42,65 +42,229 @@ document.addEventListener('DOMContentLoaded', function() {
  * Initialize charts with provided data
  */
 function initCharts(chartData) {
+    // ใช้ข้อมูลกิจกรรมจาก window.recentActivities ถ้ามี เพื่อให้เสถียร
+    function getDeductionEvents() {
+        if (Array.isArray(window.recentActivities) && window.recentActivities.length) {
+            return window.recentActivities.filter(ev => ev.title && /ถูกหักคะแนน/.test(ev.title));
+        }
+        // fallback DOM (กรณี script เรียกก่อนตัวแปรถูกเซ็ต)
+        const items = document.querySelectorAll('.activity-item');
+        const events = [];
+        items.forEach(item => {
+            const titleEl = item.querySelector('.activity-content p.mb-0.fw-medium');
+            const dateEl = item.querySelector('.activity-content p.text-muted');
+            if (!titleEl) return;
+            const titleText = titleEl.textContent || '';
+            if (/ถูกหักคะแนน/.test(titleText)) {
+                let dateText = '';
+                if (dateEl) {
+                    dateText = (dateEl.textContent.split('-').pop() || '').trim();
+                }
+                events.push({ title: titleText.trim(), date: dateText });
+            }
+        });
+        return events;
+    }
+
+    const deductionEvents = getDeductionEvents();
+
+    // ฟังก์ชันเสริม: กรณีมีเหตุหักคะแนนเดียว ให้แสดง 2 จุด (เริ่มต้น 100 และหลังหักเป็นคะแนนปัจจุบัน)
+    function applySingleDeductionTwoPoint(chartData, currentScore, deductionEvents) {
+        if (!chartData || !chartData.datasets || !chartData.datasets[0]) return;
+        if (deductionEvents.length !== 1 || currentScore == null) return;
+        const startLabel = chartData.labels && chartData.labels.length ? chartData.labels[0] : 'เริ่มต้น';
+        const eventLabel = deductionEvents[0].date || 'เหตุหักคะแนน';
+        chartData.labels = [startLabel, eventLabel];
+        chartData.datasets[0].data = [100, currentScore];
+    }
+
+    // ปรับข้อมูลกราฟให้แสดงการลดลงจาก 100 ไปยังคะแนนปัจจุบัน หรือแสดง 2 จุด (100 -> current) หากมีเหตุเดียว
+    try {
+        const currentScoreEl = document.getElementById('behavior-points');
+        const currentScore = currentScoreEl ? parseInt(currentScoreEl.textContent.trim(), 10) : null;
+        // กรณีเหตุหักคะแนนเดียว => สร้าง 2 จุด
+        if (deductionEvents.length === 1 && currentScore !== null) {
+            applySingleDeductionTwoPoint(chartData, currentScore, deductionEvents);
+        } else {
+            // เงื่อนไขเดิม: Interpolate หากข้อมูลคงที่
+            if (chartData && chartData.datasets && chartData.datasets[0] && Array.isArray(chartData.datasets[0].data)) {
+                const ds = chartData.datasets[0];
+                const dataArr = ds.data.slice();
+                const allSame = dataArr.length > 0 && dataArr.every(v => v === dataArr[0]);
+                if (currentScore !== null && currentScore < 100 && allSame && dataArr.length > 1) {
+                    const points = dataArr.length;
+                    const totalDrop = 100 - currentScore;
+                    const step = totalDrop / (points - 1);
+                    const newData = [];
+                    for (let i = 0; i < points - 1; i++) {
+                        const value = Math.max(currentScore, Math.round((100 - step * i) * 100) / 100);
+                        newData.push(value);
+                    }
+                    newData.push(currentScore);
+                    ds.data = newData;
+                } else if (dataArr.length > 0 && dataArr[0] !== 100) {
+                    if (currentScore !== null && currentScore <= dataArr[dataArr.length - 1]) {
+                        ds.data[0] = 100;
+                    }
+                }
+            }
+        }
+        if (chartData && chartData.datasets && chartData.datasets[0] && Array.isArray(chartData.datasets[0].data)) {
+            const ds = chartData.datasets[0];
+            const dataArr = ds.data.slice();
+            const allSame = dataArr.length > 0 && dataArr.every(v => v === dataArr[0]);
+            // เงื่อนไข: คะแนนปัจจุบัน < 100 และข้อมูลที่ได้มาทั้งหมดเป็น 100 (หรือค่าเดียวกัน) และมีมากกว่า 1 จุด
+            if (currentScore !== null && currentScore < 100 && allSame && dataArr.length > 1) {
+                const points = dataArr.length;
+                const totalDrop = 100 - currentScore;
+                const step = totalDrop / (points - 1);
+                const newData = [];
+                for (let i = 0; i < points - 1; i++) {
+                    const value = Math.max(currentScore, Math.round((100 - step * i) * 100) / 100);
+                    newData.push(value);
+                }
+                // จุดสุดท้าย = คะแนนปัจจุบันจริง
+                newData.push(currentScore);
+                ds.data = newData;
+            } else if (dataArr.length > 0 && dataArr[0] !== 100) {
+                // หากจุดเริ่มต้นไม่ใช่ 100 แต่เราต้องการให้เริ่มที่ 100 (ตาม requirement) และข้อมูลยังไม่ลดลง
+                if (currentScore !== null && currentScore <= dataArr[dataArr.length - 1]) {
+                    ds.data[0] = 100;
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Chart data adjustment failed:', e);
+    }
+
+    const options = {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true, // เริ่มที่ 0
+                min: 0,
+                max: 100, // สูงสุด 100
+                ticks: {
+                    stepSize: 20
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: chartData.datasets.length > 1, // แสดงเมื่อมีหลาย dataset
+                position: 'top'
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        let label = context.dataset.label || '';
+                        if (label) {
+                            label += ': ';
+                        }
+                        if (context.parsed.y !== null) {
+                            label += `${context.parsed.y} คะแนน`;
+                        }
+                        return label;
+                    }
+                }
+            }
+        },
+        elements: {
+            line: {
+                tension: 0.3, // ทำให้เส้นโค้งเล็กน้อย
+                borderWidth: 3,
+            },
+            point: {
+                radius: 5,
+                hoverRadius: 7
+            }
+        }
+    };
+
+    // สร้าง Gradient
+    const createGradient = (ctx) => {
+        if (!ctx || !ctx.canvas) return 'rgba(59, 130, 246, 0.1)';
+        const chart = ctx.canvas.getContext('2d');
+        if(!chart) return 'rgba(59, 130, 246, 0.1)';
+        const gradient = chart.createLinearGradient(0, 0, 0, ctx.canvas.height);
+        gradient.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
+        gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+        return gradient;
+    };
+
     // Desktop Chart
     const desktopCtx = document.getElementById('behaviorChart');
     if (desktopCtx) {
-        // ทำลายกราฟเก่าก่อนสร้างใหม่
         if (behaviorChart) {
             behaviorChart.destroy();
         }
         
-        behaviorChart = new Chart(desktopCtx.getContext('2d'), {
+        const desktopChartCtx = desktopCtx.getContext('2d');
+        const gradient = createGradient(desktopChartCtx);
+
+        // เพิ่มสีพื้นหลังให้ dataset
+        const desktopData = JSON.parse(JSON.stringify(chartData)); // Deep copy
+        if(desktopData.datasets[0]){
+            desktopData.datasets[0].fill = true;
+            desktopData.datasets[0].backgroundColor = gradient;
+        }
+
+        behaviorChart = new Chart(desktopChartCtx, {
             type: 'line',
-            data: chartData,
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        min: 50,
-                        max: 100
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top'
-                    }
-                }
-            }
+            data: desktopData,
+            options: { ...options, plugins: { ...options.plugins, legend: { display: false } } }
         });
+
+        // บังคับปรับหลังสร้าง (กันกรณี DOM ไม่พร้อม) หากเหตุเดียว -> 2 จุด
+        if (deductionEvents.length === 1) {
+            try {
+                const currentScoreEl = document.getElementById('behavior-points');
+                const currentScore = currentScoreEl ? parseInt(currentScoreEl.textContent.trim(), 10) : null;
+                if (currentScore !== null) {
+                    applySingleDeductionTwoPoint(behaviorChart.data, currentScore, deductionEvents);
+                    behaviorChart.update();
+                }
+            } catch (err) {
+                console.warn('Single-point override failed (desktop):', err);
+            }
+        }
     }
     
     // Mobile Chart
-    const mobilectx = document.getElementById('behaviorChartMobile');
-    if (mobilectx) {
-        // ทำลายกราฟเก่าก่อนสร้างใหม่
+    const mobileCtx = document.getElementById('behaviorChartMobile');
+    if (mobileCtx) {
         if (behaviorChartMobile) {
             behaviorChartMobile.destroy();
         }
+
+        const mobileChartCtx = mobileCtx.getContext('2d');
+        const mobileGradient = createGradient(mobileChartCtx);
+
+        const mobileData = JSON.parse(JSON.stringify(chartData)); // Deep copy
+        if(mobileData.datasets[0]){
+            mobileData.datasets[0].fill = true;
+            mobileData.datasets[0].backgroundColor = mobileGradient;
+        }
         
-        behaviorChartMobile = new Chart(mobilectx.getContext('2d'), {
+        behaviorChartMobile = new Chart(mobileChartCtx, {
             type: 'line',
-            data: chartData,
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        min: 50,
-                        max: 100
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                }
-            }
+            data: mobileData,
+            options: { ...options, plugins: { ...options.plugins, legend: { display: false } } }
         });
+
+        if (deductionEvents.length === 1) {
+            try {
+                const currentScoreEl = document.getElementById('behavior-points');
+                const currentScore = currentScoreEl ? parseInt(currentScoreEl.textContent.trim(), 10) : null;
+                if (currentScore !== null) {
+                    applySingleDeductionTwoPoint(behaviorChartMobile.data, currentScore, deductionEvents);
+                    behaviorChartMobile.update();
+                }
+            } catch (err) {
+                console.warn('Single-point override failed (mobile):', err);
+            }
+        }
     }
 }
 

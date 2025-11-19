@@ -524,61 +524,132 @@ class StudentController extends Controller
     private function getBehaviorChartData($studentId)
     {
         if (!$studentId) {
-            return [
-                'labels' => ['ม.ค. 67', 'ก.พ. 67', 'มี.ค. 67', 'เม.ย. 67', 'พ.ค. 67', 'มิ.ย. 67'],
-                'datasets' => [
-                    [
-                        'label' => 'คะแนนสะสม',
-                        'data' => [100, 100, 100, 100, 100, 100],
-                        'borderColor' => '#1020AD',
-                        'backgroundColor' => 'rgba(16, 32, 173, 0.1)',
-                        'tension' => 0.3
-                    ]
-                ]
-            ];
+            return $this->getEmptyChartData();
         }
-        
+
         try {
-            $months = [];
+            $academicYearService = app(\App\Services\AcademicYearService::class);
+            $currentSemester = $academicYearService->getCurrentSemester();
+            $currentAcademicYear = $academicYearService->getCurrentAcademicYear();
+
+            // Define months for each semester based on config
+            $semester1Config = config('academic.semester_periods.1');
+            $semester2Config = config('academic.semester_periods.2');
+
+            $semesterMonths = [];
+            if ($currentSemester == 1) {
+                // Term 1: May to October
+                for ($m = $semester1Config['start_month']; $m <= $semester1Config['end_month']; $m++) {
+                    $semesterMonths[] = $m;
+                }
+            } else {
+                // Term 2: November to May of next year
+                for ($m = $semester2Config['start_month']; $m <= 12; $m++) {
+                    $semesterMonths[] = $m;
+                }
+                for ($m = 1; $m <= $semester2Config['end_month']; $m++) {
+                    $semesterMonths[] = $m;
+                }
+            }
+
+            $now = Carbon::now();
+            $labels = [];
             $scores = [];
             
-            $currentScore = DB::table('tb_students')
-                ->where('students_id', $studentId)
-                ->value('students_current_score') ?? 100;
-            
-            for ($i = 5; $i >= 0; $i--) {
-                $date = Carbon::now()->subMonths($i);
-                $months[] = $date->locale('th')->format('M Y');
-                $scores[] = $currentScore;
+            $reports = DB::table('tb_behavior_reports')
+                ->where('student_id', $studentId)
+                ->where('reports_academic_year', $currentAcademicYear)
+                ->select('reports_report_date', 'reports_points_deducted')
+                ->orderBy('reports_report_date', 'asc')
+                ->get()
+                ->map(function ($report) {
+                    return [
+                        'date' => Carbon::parse($report->reports_report_date),
+                        'points' => abs((int)$report->reports_points_deducted)
+                    ];
+                });
+
+            $lastMonthScore = 100;
+
+            foreach ($semesterMonths as $month) {
+                $year = $currentAcademicYear;
+                if ($currentSemester == 2 && $month < $semester2Config['start_month']) {
+                    $year = $currentAcademicYear + 1;
+                }
+
+                $dateInMonth = Carbon::createFromDate($year, $month, 1)->endOfMonth();
+
+                if ($dateInMonth->isFuture() && !$dateInMonth->isSameMonth($now)) {
+                    continue;
+                }
+
+                $deductionForMonth = $reports
+                    ->where('date.month', $month)
+                    ->where('date.year', $year)
+                    ->sum('points');
+                
+                $currentMonthScore = max(0, $lastMonthScore - $deductionForMonth);
+
+                $labels[] = $academicYearService->getThaiMonth($month) . ' ' . substr($year + 543, -2);
+                $scores[] = $currentMonthScore;
+
+                $lastMonthScore = $currentMonthScore;
             }
-            
+
+            if (empty($labels)) {
+                $currentScore = DB::table('tb_students')->where('students_id', $studentId)->value('students_current_score') ?? 100;
+                return [
+                    'labels' => ['ปัจจุบัน'],
+                    'datasets' => [
+                        [
+                            'label' => 'คะแนน',
+                            'data' => [$currentScore],
+                            'borderColor' => '#3b82f6',
+                            'backgroundColor' => 'rgba(59, 130, 246, 0.1)',
+                            'tension' => 0.3
+                        ]
+                    ]
+                ];
+            }
+
             return [
-                'labels' => $months,
+                'labels' => $labels,
                 'datasets' => [
                     [
                         'label' => 'คะแนนสะสม',
                         'data' => $scores,
-                        'borderColor' => '#1020AD',
-                        'backgroundColor' => 'rgba(16, 32, 173, 0.1)',
+                        'borderColor' => '#3b82f6',
+                        'backgroundColor' => 'rgba(59, 130, 246, 0.1)',
                         'tension' => 0.3
                     ]
                 ]
             ];
-            
+
         } catch (\Exception $e) {
-            Log::error('Error getting chart data: ' . $e->getMessage());
-            return [
-                'labels' => ['ม.ค. 67', 'ก.พ. 67', 'มี.ค. 67', 'เม.ย. 67', 'พ.ค. 67', 'มิ.ย. 67'],
-                'datasets' => [
-                    [
-                        'label' => 'คะแนนสะสม',
-                        'data' => [100, 100, 100, 100, 100, 100],
-                        'borderColor' => '#1020AD',
-                        'backgroundColor' => 'rgba(16, 32, 173, 0.1)',
-                        'tension' => 0.3
-                    ]
-                ]
-            ];
+            Log::error('Error getting chart data for student ' . $studentId . ': ' . $e->getMessage() . ' on line ' . $e->getLine());
+            return $this->getEmptyChartData();
         }
+    }
+
+    private function getEmptyChartData()
+    {
+        $labels = [];
+        $now = Carbon::now();
+        for ($i = 3; $i >= 0; $i--) {
+            $labels[] = $now->copy()->subMonths($i)->locale('th')->format('M Y');
+        }
+
+        return [
+            'labels' => $labels,
+            'datasets' => [
+                [
+                    'label' => 'คะแนน',
+                    'data' => [100, 100, 100, 100],
+                    'borderColor' => '#3b82f6',
+                    'backgroundColor' => 'rgba(59, 130, 246, 0.1)',
+                    'tension' => 0.3
+                ]
+            ]
+        ];
     }
 }

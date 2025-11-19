@@ -583,6 +583,9 @@
             'data' => [1],
             'colors' => ['#e9ecef']
         ]);
+
+        // เพิ่ม recentActivities เพื่อใช้ตรวจสอบจำนวนเหตุหักคะแนนโดยไม่ต้องพึ่ง DOM timing
+        window.recentActivities = @json($recent_activities ?? []);
     </script>
 
     <!-- Hidden logout form for client-side logout submission -->
