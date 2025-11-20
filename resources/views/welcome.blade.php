@@ -327,7 +327,7 @@
                         <a href="/login" class="btn btn-light text-primary-app py-2 px-4 rounded-pill fw-medium btn-hover-effect">
                             <i class="fas fa-sign-in-alt me-2"></i> เข้าสู่ระบบ
                         </a>
-                        <a href="#" class="btn btn-secondary-app py-2 px-4 rounded-pill fw-medium btn-hover-effect">
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#moreInfoModal" class="btn btn-secondary-app py-2 px-4 rounded-pill fw-medium btn-hover-effect">
                             <i class="fas fa-info-circle me-2"></i> ข้อมูลเพิ่มเติม
                         </a>
                     </div>
@@ -539,5 +539,176 @@
             }
         });
     </script>
+
+    <!-- More Info Modal -->
+    <div class="modal fade" id="moreInfoModal" tabindex="-1" aria-labelledby="moreInfoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content" style="border-radius: 16px;">
+                <div class="modal-header bg-primary-app text-white" style="border-radius: 16px 16px 0 0;">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-white bg-opacity-20 rounded-circle p-2 me-3">
+                            <i class="fas fa-info-circle fs-4"></i>
+                        </div>
+                        <div>
+                            <h5 class="modal-title mb-0 fw-bold" id="moreInfoModalLabel">ข้อมูลเพิ่มเติม</h5>
+                            <small class="opacity-75">เกี่ยวกับระบบติดตามพฤติกรรมวินัยนักเรียน</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <!-- ข้อมูลระบบ -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary-app mb-3">
+                            <i class="fas fa-laptop-code me-2"></i>เกี่ยวกับระบบ
+                        </h6>
+                        <p class="text-muted">
+                            ระบบติดตามพฤติกรรมวินัยนักเรียนถูกพัฒนาขึ้นเพื่อช่วยให้ครูและบุคลากรทางการศึกษาสามารถบันทึกและติดตามพฤติกรรมของนักเรียนได้อย่างมีประสิทธิภาพ 
+                            โดยมีระบบคำนวณคะแนนความประพฤติอัตโนมัติและสามารถออกรายงานสรุปได้หลากหลายรูปแบบ
+                        </p>
+                    </div>
+
+                    <!-- ฟีเจอร์หลัก -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary-app mb-3">
+                            <i class="fas fa-star me-2"></i>ฟีเจอร์หลักของระบบ
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="d-flex">
+                                    <div class="bg-primary-app text-white rounded-circle p-2 me-3 flex-shrink-0" style="width: 36px; height: 36px;">
+                                        <i class="fas fa-clipboard-list small d-flex align-items-center justify-content-center h-100"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-1">บันทึกพฤติกรรม</h6>
+                                        <small class="text-muted">บันทึกพฤติกรรมของนักเรียนได้อย่างรวดเร็ว</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex">
+                                    <div class="bg-accent-app text-white rounded-circle p-2 me-3 flex-shrink-0" style="width: 36px; height: 36px;">
+                                        <i class="fas fa-chart-bar small d-flex align-items-center justify-content-center h-100"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-1">รายงานและสถิติ</h6>
+                                        <small class="text-muted">ดูรายงานสรุปและกราฟวิเคราะห์</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex">
+                                    <div class="bg-warning text-white rounded-circle p-2 me-3 flex-shrink-0" style="width: 36px; height: 36px;">
+                                        <i class="fas fa-bell small d-flex align-items-center justify-content-center h-100"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-1">แจ้งเตือนอัตโนมัติ</h6>
+                                        <small class="text-muted">แจ้งเตือนผู้ปกครองเมื่อมีพฤติกรรม</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex">
+                                    <div class="bg-success text-white rounded-circle p-2 me-3 flex-shrink-0" style="width: 36px; height: 36px;">
+                                        <i class="fas fa-file-export small d-flex align-items-center justify-content-center h-100"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-1">ส่งออกรายงาน</h6>
+                                        <small class="text-muted">ออกรายงานเป็นไฟล์ PDF และ Excel</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- กลุ่มผู้ใช้งาน -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary-app mb-3">
+                            <i class="fas fa-users me-2"></i>กลุ่มผู้ใช้งาน
+                        </h6>
+                        <div class="row g-2">
+                            <div class="col-6 col-md-3">
+                                <div class="card border h-100">
+                                    <div class="card-body text-center p-3">
+                                        <div class="text-primary-app mb-2">
+                                            <i class="fas fa-user-shield fa-2x"></i>
+                                        </div>
+                                        <h6 class="small mb-0">ผู้ดูแลระบบ</h6>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="card border h-100">
+                                    <div class="card-body text-center p-3">
+                                        <div class="text-info mb-2">
+                                            <i class="fas fa-chalkboard-teacher fa-2x"></i>
+                                        </div>
+                                        <h6 class="small mb-0">ครู</h6>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="card border h-100">
+                                    <div class="card-body text-center p-3">
+                                        <div class="text-warning mb-2">
+                                            <i class="fas fa-graduation-cap fa-2x"></i>
+                                        </div>
+                                        <h6 class="small mb-0">นักเรียน</h6>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="card border h-100">
+                                    <div class="card-body text-center p-3">
+                                        <div class="text-success mb-2">
+                                            <i class="fas fa-user-friends fa-2x"></i>
+                                        </div>
+                                        <h6 class="small mb-0">ผู้ปกครอง</h6>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ข้อมูลติดต่อ -->
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-primary-app mb-3">
+                            <i class="fas fa-phone me-2"></i>ติดต่อเรา
+                        </h6>
+                        <div class="card bg-light border-0">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="d-flex align-items-start">
+                                            <i class="fas fa-school text-primary-app me-2 mt-1"></i>
+                                            <div>
+                                                <small class="text-muted d-block">โรงเรียน</small>
+                                                <span class="fw-medium">โรงเรียนนวมินทราชูทิศ มัชฌิม</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="d-flex align-items-start">
+                                            <i class="fas fa-map-marker-alt text-danger me-2 mt-1"></i>
+                                            <div>
+                                                <small class="text-muted d-block">ที่ตั้ง</small>
+                                                <span class="fw-medium">จังหวัดนครสวรรค์</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light" style="border-radius: 0 0 16px 16px;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
+                    <a href="/login" class="btn btn-primary-app">
+                        <i class="fas fa-sign-in-alt me-2"></i>เข้าสู่ระบบ
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

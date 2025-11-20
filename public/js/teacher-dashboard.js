@@ -1,5 +1,5 @@
 // Set current date
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Set current date in Thai format
     const today = new Date();
     const options = { year: 'numeric', month: 'long', day: 'numeric' };
@@ -8,14 +8,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (currentDateElement) {
         currentDateElement.textContent = thaiDate;
     }
-    
+
     // ตรวจสอบว่า DOM พร้อมแล้ว
     setTimeout(() => {
         // เช็คว่าองค์ประกอบสำคัญโหลดแล้วหรือยัง
         const overviewSection = document.getElementById('overview');
         const statCards = document.querySelectorAll('#overview .stat-card');
-    
-        
+
+
         if (statCards.length >= 4) {
             // โหลดข้อมูลสถิติประจำเดือน
             loadMonthlyStats();
@@ -25,29 +25,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 loadMonthlyStats();
             }, 1000);
         }
-        
+
         // Initialize charts
         loadViolationTrendChart();
         loadViolationTypesChart();
-        
+
     }, 100); // รอ 100ms ให้ DOM โหลดเสร็จ
-    
+
     // Mobile navigation active state
     const navLinks = document.querySelectorAll('.bottom-navbar .nav-link');
     navLinks.forEach(link => {
-        link.addEventListener('click', function() {
+        link.addEventListener('click', function () {
             // Remove active class from all links
             navLinks.forEach(l => l.classList.remove('active', 'text-primary-app'));
             // Add active class to clicked link
             this.classList.add('active', 'text-primary-app');
         });
     });
-    
+
     // Sidebar navigation active state
     const menuItems = document.querySelectorAll('.sidebar-menu .menu-item');
     menuItems.forEach(item => {
         if (!item.hasAttribute('data-bs-toggle')) {
-            item.addEventListener('click', function() {
+            item.addEventListener('click', function () {
                 // Remove active class from all items
                 menuItems.forEach(i => i.classList.remove('active'));
                 // Add active class to clicked item
@@ -55,32 +55,32 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
-    
+
     // (Removed simulated student search in modal to reduce unused code)
-    
+
     // Date restriction for violation date (max 3 days in the past)
     const dateInput = document.querySelector('#violationDate');
     if (dateInput) {
         const today = new Date();
         const threeDaysAgo = new Date();
         threeDaysAgo.setDate(today.getDate() - 3);
-        
+
         dateInput.valueAsDate = today;
         dateInput.min = threeDaysAgo.toISOString().split('T')[0];
         dateInput.max = today.toISOString().split('T')[0];
     }
-    
+
     // Initialize popovers and tooltips if using them
     const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
     if (popoverTriggerList.length > 0) {
         const popoverList = [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
     }
-    
+
     const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
     if (tooltipTriggerList.length > 0) {
         const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
     }
-    
+
     // สำหรับแสดงฟอร์มเพิ่มประเภทพฤติกรรมใหม่
     const violationTypesList = document.getElementById('violationTypesList');
     const violationTypeForm = document.getElementById('violationTypeForm');
@@ -90,38 +90,38 @@ document.addEventListener('DOMContentLoaded', function() {
     const studentSearch = document.getElementById('studentSearch');
     const btnSearchStudent = document.getElementById('btnSearchStudent');
     const classFilter = document.getElementById('classFilter');
-    
+
     // ปุ่มปิดฟอร์ม
     if (btnCloseViolationForm) {
-        btnCloseViolationForm.addEventListener('click', function() {
+        btnCloseViolationForm.addEventListener('click', function () {
             if (violationTypeForm) violationTypeForm.classList.add('d-none');
             if (violationTypesList) violationTypesList.classList.remove('d-none');
         });
     }
-    
+
     // ปุ่มยกเลิกในฟอร์ม
     if (btnCancelViolationType) {
-        btnCancelViolationType.addEventListener('click', function() {
+        btnCancelViolationType.addEventListener('click', function () {
             if (violationTypeForm) violationTypeForm.classList.add('d-none');
             if (violationTypesList) violationTypesList.classList.remove('d-none');
         });
     }
-    
+
     // จัดการปุ่มแก้ไข
     const editButtons = document.querySelectorAll('.edit-violation-btn');
     editButtons.forEach(button => {
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function () {
             const violationId = this.getAttribute('data-id');
             editViolationType(violationId);
         });
     });
-    
+
     // จัดการปุ่มลบ
     const deleteButtons = document.querySelectorAll('.delete-violation-btn');
     const deleteViolationModal = document.getElementById('deleteViolationModal');
-    
+
     deleteButtons.forEach(button => {
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function () {
             const violationId = this.getAttribute('data-id');
             const deleteViolationId = document.getElementById('deleteViolationId');
             if (deleteViolationId) {
@@ -133,11 +133,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-    
+
     // ปุ่มยืนยันการลบ
     const confirmDeleteBtn = document.getElementById('confirmDeleteViolation');
     if (confirmDeleteBtn) {
-        confirmDeleteBtn.addEventListener('click', function() {
+        confirmDeleteBtn.addEventListener('click', function () {
             const deleteViolationId = document.getElementById('deleteViolationId');
             if (deleteViolationId) {
                 const violationId = deleteViolationId.value;
@@ -145,25 +145,25 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
+
     // การบันทึกฟอร์ม
     const formViolationType = document.getElementById('formViolationType');
     if (formViolationType) {
-        formViolationType.addEventListener('submit', function(e) {
+        formViolationType.addEventListener('submit', function (e) {
             e.preventDefault();
             saveViolationType();
         });
     }
-    
+
     // ค้นหาประเภทพฤติกรรม
     const violationTypeSearch = document.getElementById('violationTypeSearch');
     if (violationTypeSearch) {
-        violationTypeSearch.addEventListener('keyup', function(e) {
+        violationTypeSearch.addEventListener('keyup', function (e) {
             const searchTerm = this.value.trim();
             filterViolationTypes(searchTerm);
         });
     }
-    
+
     // แก้ไขการใช้ jQuery ด้วย Vanilla JavaScript
     // ยกเลิกการเรียก loadViolationTypes() ซ้ำเมื่อเปิด modal รายการประเภทพฤติกรรม
     // เพราะ behavior-report.js จัดการโหลดและอัปเดต select แล้ว
@@ -174,7 +174,7 @@ document.addEventListener('DOMContentLoaded', function() {
     //         loadViolationTypes(); // removed to avoid duplicate options
     //     });
     // }
-    
+
     // ปิดการโหลดประเภทพฤติกรรมซ้ำใน modal (ให้ behavior-report.js จัดการเท่านั้น)
     // const newViolationModal = document.getElementById('newViolationModal');
     // if (newViolationModal) {
@@ -184,41 +184,42 @@ document.addEventListener('DOMContentLoaded', function() {
     // }
 
     if (studentSearch && btnSearchStudent) {
-        btnSearchStudent.addEventListener('click', function() {
-            searchStudents();
+        btnSearchStudent.addEventListener('click', function () {
+            searchStudents(studentSearch.value);
         });
-        
-        studentSearch.addEventListener('keypress', function(e) {
+
+        studentSearch.addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                searchStudents();
+                searchStudents(this.value);
             }
         });
     }
-    
+
     if (classFilter) {
-        classFilter.addEventListener('change', function() {
-            searchStudents();
+        classFilter.addEventListener('change', function () {
+            const searchInput = document.getElementById('studentSearch');
+            searchStudents(searchInput ? searchInput.value : '');
         });
     }
 
     // Profile image preview
     const profileInput = document.getElementById('profile_image');
     const profilePreview = document.getElementById('profile-preview');
-    
+
     if (profileInput && profilePreview) {
-        profileInput.addEventListener('change', function(e) {
+        profileInput.addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (file) {
                 const reader = new FileReader();
-                reader.onload = function(e) {
+                reader.onload = function (e) {
                     profilePreview.src = e.target.result;
                 };
                 reader.readAsDataURL(file);
             }
         });
     }
-    
+
     // โหลดข้อมูลสถิติประจำเดือน
     loadMonthlyStats();
 });
@@ -232,17 +233,17 @@ function loadMonthlyStats() {
             'X-Requested-With': 'XMLHttpRequest'
         }
     })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            updateStatsDisplay(result.data);
-        } else {
-            console.error('Error loading monthly stats:', result.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error fetching monthly stats:', error);
-    });
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                updateStatsDisplay(result.data);
+            } else {
+                console.error('Error loading monthly stats:', result.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching monthly stats:', error);
+        });
 }
 
 // ฟังก์ชันอัปเดตการแสดงข้อมูลสถิติ
@@ -253,70 +254,70 @@ function updateStatsDisplay(stats) {
         if (violationValueEl) {
             violationValueEl.textContent = stats.violation_count || 0;
         }
-        
+
         // อัปเดตแนวโน้มจำนวนพฤติกรรม
         const violationTrendEl = document.querySelector('#overview .stat-card:nth-child(2) .stat-change');
         if (violationTrendEl) {
-            violationTrendEl.className = 'stat-change mb-0 ' + 
+            violationTrendEl.className = 'stat-change mb-0 ' +
                 (stats.violation_trend > 0 ? 'increase' : (stats.violation_trend < 0 ? 'decrease' : 'no-change'));
             violationTrendEl.innerHTML = `
                 <i class="fas fa-${stats.violation_trend > 0 ? 'arrow-up' : (stats.violation_trend < 0 ? 'arrow-down' : 'equals')} me-1"></i>
                 ${Math.abs(stats.violation_trend)}% จากเดือนก่อน
             `;
         }
-        
+
         // อัปเดตจำนวนนักเรียนที่ถูกบันทึก
         const studentsValueEl = document.querySelector('#overview .stat-card:nth-child(3) .stat-value');
         if (studentsValueEl) {
             studentsValueEl.textContent = stats.students_count || 0;
         }
-        
+
         // อัปเดตแนวโน้มจำนวนนักเรียน
         const studentsTrendEl = document.querySelector('#overview .stat-card:nth-child(3) .stat-change');
         if (studentsTrendEl) {
-            studentsTrendEl.className = 'stat-change mb-0 ' + 
+            studentsTrendEl.className = 'stat-change mb-0 ' +
                 (stats.students_trend > 0 ? 'increase' : (stats.students_trend < 0 ? 'decrease' : 'no-change'));
             studentsTrendEl.innerHTML = `
                 <i class="fas fa-${stats.students_trend > 0 ? 'arrow-up' : (stats.students_trend < 0 ? 'arrow-down' : 'equals')} me-1"></i>
                 ${Math.abs(stats.students_trend)}% จากเดือนก่อน
             `;
         }
-        
+
         // อัปเดตจำนวนพฤติกรรมรุนแรง
         const severeValueEl = document.querySelector('#overview .stat-card:nth-child(4) .stat-value');
         if (severeValueEl) {
             severeValueEl.textContent = stats.severe_count || 0;
         }
-        
+
         // อัปเดตแนวโน้มพฤติกรรมรุนแรง
         const severeTrendEl = document.querySelector('#overview .stat-card:nth-child(4) .stat-change');
         if (severeTrendEl) {
-            severeTrendEl.className = 'stat-change mb-0 ' + 
+            severeTrendEl.className = 'stat-change mb-0 ' +
                 (stats.severe_trend > 0 ? 'increase' : (stats.severe_trend < 0 ? 'decrease' : 'no-change'));
             severeTrendEl.innerHTML = `
                 <i class="fas fa-${stats.severe_trend > 0 ? 'arrow-up' : (stats.severe_trend < 0 ? 'arrow-down' : 'equals')} me-1"></i>
                 ${Math.abs(stats.severe_trend)}% จากเดือนก่อน
             `;
         }
-        
+
         // อัปเดตคะแนนเฉลี่ย
         const scoreValueEl = document.querySelector('#overview .stat-card:nth-child(5) .stat-value');
         if (scoreValueEl) {
             scoreValueEl.textContent = stats.avg_score.toFixed(1);
         }
-        
+
         // อัปเดตแนวโน้มคะแนนเฉลี่ย
         const scoreTrendEl = document.querySelector('#overview .stat-card:nth-child(5) .stat-change');
         if (scoreTrendEl) {
-            scoreTrendEl.className = 'stat-change mb-0 ' + 
+            scoreTrendEl.className = 'stat-change mb-0 ' +
                 (stats.score_trend > 0 ? 'increase' : (stats.score_trend < 0 ? 'decrease' : 'no-change'));
             scoreTrendEl.innerHTML = `
                 <i class="fas fa-${stats.score_trend > 0 ? 'arrow-up' : (stats.score_trend < 0 ? 'arrow-down' : 'equals')} me-1"></i>
                 ${Math.abs(stats.score_trend)} คะแนนจากเดือนก่อน
             `;
         }
-    
-        
+
+
     } catch (error) {
         console.error('Error updating stats display:', error);
     }
@@ -326,7 +327,7 @@ function updateStatsDisplay(stats) {
 function loadViolationTrendChart() {
     const ctx = document.getElementById('violationTrend');
     if (!ctx) return;
-    
+
     // แสดง Loading indicator
     const loadingDiv = document.createElement('div');
     loadingDiv.className = 'chart-loading';
@@ -337,7 +338,7 @@ function loadViolationTrendChart() {
         <span class="ms-2">กำลังโหลดข้อมูล...</span>
     `;
     ctx.parentNode.insertBefore(loadingDiv, ctx);
-    
+
     fetch('/api/dashboard/trends', {
         method: 'GET',
         headers: {
@@ -345,32 +346,32 @@ function loadViolationTrendChart() {
             'X-Requested-With': 'XMLHttpRequest'
         }
     })
-    .then(response => response.json())
-    .then(result => {
-        // ลบ Loading indicator
-        if (loadingDiv) loadingDiv.remove();
-        
-        if (result.success) {
-            initViolationTrendChart(result.data);
-        } else {
-            console.error('Error loading trend data:', result.message);
+        .then(response => response.json())
+        .then(result => {
+            // ลบ Loading indicator
+            if (loadingDiv) loadingDiv.remove();
+
+            if (result.success) {
+                initViolationTrendChart(result.data);
+            } else {
+                console.error('Error loading trend data:', result.message);
+                initViolationTrendChart(null); // ใช้ข้อมูลเริ่มต้น
+            }
+        })
+        .catch(error => {
+            // ลบ Loading indicator
+            if (loadingDiv) loadingDiv.remove();
+
+            console.error('Error fetching trend data:', error);
             initViolationTrendChart(null); // ใช้ข้อมูลเริ่มต้น
-        }
-    })
-    .catch(error => {
-        // ลบ Loading indicator
-        if (loadingDiv) loadingDiv.remove();
-        
-        console.error('Error fetching trend data:', error);
-        initViolationTrendChart(null); // ใช้ข้อมูลเริ่มต้น
-    });
+        });
 }
 
 // ปรับปรุงฟังก์ชันโหลดกราฟประเภทพฤติกรรม
 function loadViolationTypesChart() {
     const ctx = document.getElementById('violationTypes');
     if (!ctx) return;
-    
+
     // แสดง Loading indicator
     const loadingDiv = document.createElement('div');
     loadingDiv.className = 'chart-loading';
@@ -381,7 +382,7 @@ function loadViolationTypesChart() {
         <span class="ms-2">กำลังโหลดข้อมูล...</span>
     `;
     ctx.parentNode.insertBefore(loadingDiv, ctx);
-    
+
     fetch('/api/dashboard/violations', {
         method: 'GET',
         headers: {
@@ -389,37 +390,37 @@ function loadViolationTypesChart() {
             'X-Requested-With': 'XMLHttpRequest'
         }
     })
-    .then(response => response.json())
-    .then(result => {
-        // ลบ Loading indicator
-        if (loadingDiv) loadingDiv.remove();
-        
-        if (result.success) {
-            initViolationTypesChart(result.data);
-        } else {
-            console.error('Error loading violation types data:', result.message);
+        .then(response => response.json())
+        .then(result => {
+            // ลบ Loading indicator
+            if (loadingDiv) loadingDiv.remove();
+
+            if (result.success) {
+                initViolationTypesChart(result.data);
+            } else {
+                console.error('Error loading violation types data:', result.message);
+                initViolationTypesChart(null); // ใช้ข้อมูลเริ่มต้น
+            }
+        })
+        .catch(error => {
+            // ลบ Loading indicator
+            if (loadingDiv) loadingDiv.remove();
+
+            console.error('Error fetching violation types data:', error);
             initViolationTypesChart(null); // ใช้ข้อมูลเริ่มต้น
-        }
-    })
-    .catch(error => {
-        // ลบ Loading indicator
-        if (loadingDiv) loadingDiv.remove();
-        
-        console.error('Error fetching violation types data:', error);
-        initViolationTypesChart(null); // ใช้ข้อมูลเริ่มต้น
-    });
+        });
 }
 
 // ปรับปรุงฟังก์ชันสร้างกราฟแนวโน้ม
 function initViolationTrendChart(chartData) {
     const ctx = document.getElementById('violationTrend');
     if (!ctx) return;
-    
+
     // ลบกราฟเดิมถ้ามี
     if (window.violationTrendChart instanceof Chart) {
         window.violationTrendChart.destroy();
     }
-    
+
     // ถ้าไม่มีข้อมูล ใช้ข้อมูลเริ่มต้น
     if (!chartData) {
         chartData = {
@@ -434,7 +435,7 @@ function initViolationTrendChart(chartData) {
             }]
         };
     }
-    
+
     // สร้างกราฟใหม่
     window.violationTrendChart = new Chart(ctx, {
         type: 'line',
@@ -474,12 +475,12 @@ function initViolationTrendChart(chartData) {
 function initViolationTypesChart(chartData) {
     const ctx = document.getElementById('violationTypes');
     if (!ctx) return;
-    
+
     // ลบกราฟเดิมถ้ามี
     if (window.violationTypesChart instanceof Chart) {
         window.violationTypesChart.destroy();
     }
-    
+
     // ถ้าไม่มีข้อมูล ใช้ข้อมูลเริ่มต้น
     if (!chartData) {
         chartData = {
@@ -495,7 +496,7 @@ function initViolationTypesChart(chartData) {
             }]
         };
     }
-    
+
     // สร้างกราฟใหม่
     window.violationTypesChart = new Chart(ctx, {
         type: 'doughnut',
@@ -524,16 +525,16 @@ function initViolationTypesChart(chartData) {
 function searchStudents() {
     const searchInput = document.querySelector('#students .form-control');
     if (searchInput) {
-        searchInput.addEventListener('input', function() {
+        searchInput.addEventListener('input', function () {
             const searchTerm = this.value;
             const url = new URL(window.location.href);
-            
+
             if (searchTerm) {
                 url.searchParams.set('search', searchTerm);
             } else {
                 url.searchParams.delete('search');
             }
-            
+
             // โหลดหน้าใหม่พร้อมพารามิเตอร์ค้นหา
             window.location.href = url.toString();
         });
@@ -541,7 +542,7 @@ function searchStudents() {
 }
 
 // เรียกใช้เมื่อหน้าโหลดเสร็จ
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     searchStudents();
 });
 
@@ -619,7 +620,7 @@ function showToast(message, type = 'info') {
     const toastContainer = document.getElementById('toast-container') || createToastContainer();
     const toastId = 'toast-' + Date.now();
     const bgClass = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : 'bg-info';
-    
+
     const toastHTML = `
         <div id="${toastId}" class="toast align-items-center text-white ${bgClass} border-0" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="d-flex">
@@ -630,18 +631,18 @@ function showToast(message, type = 'info') {
             </div>
         </div>
     `;
-    
+
     toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-    
+
     const toastElement = document.getElementById(toastId);
     const toast = new bootstrap.Toast(toastElement, {
         autohide: true,
         delay: 5000
     });
     toast.show();
-    
+
     // ลบ toast หลังจากซ่อน
-    toastElement.addEventListener('hidden.bs.toast', function() {
+    toastElement.addEventListener('hidden.bs.toast', function () {
         this.remove();
     });
 }
@@ -670,11 +671,11 @@ function fetchViolations(page = 1, search = '') {
             </tr>
         `;
     }
-    
+
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     params.append('page', page);
-    
+
     fetch(`/api/violations?${params.toString()}`, {
         headers: {
             'Accept': 'application/json',
@@ -682,43 +683,43 @@ function fetchViolations(page = 1, search = '') {
             'X-CSRF-TOKEN': violationManager.csrfToken
         }
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        // ตรวจสอบโครงสร้างข้อมูลที่ได้รับ
-        if (data && data.data) {
-            // ถ้าข้อมูลมาในรูปแบบ Laravel pagination
-            if (data.data.data && Array.isArray(data.data.data)) {
-                renderViolationsList(data.data.data);
-                renderPagination(data.data);
-            } 
-            // ถ้าข้อมูลมาในรูปแบบ array ธรรมดา
-            else if (Array.isArray(data.data)) {
-                renderViolationsList(data.data);
-                // ไม่มี pagination สำหรับข้อมูลแบบ array ธรรมดา
-                const paginationContainer = document.querySelector('#violationTypesList .pagination');
-                if (paginationContainer) paginationContainer.innerHTML = '';
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-            else {
-                // ถ้าโครงสร้างข้อมูลไม่ตรงกับที่คาดหวัง
+            return response.json();
+        })
+        .then(data => {
+            // ตรวจสอบโครงสร้างข้อมูลที่ได้รับ
+            if (data && data.data) {
+                // ถ้าข้อมูลมาในรูปแบบ Laravel pagination
+                if (data.data.data && Array.isArray(data.data.data)) {
+                    renderViolationsList(data.data.data);
+                    renderPagination(data.data);
+                }
+                // ถ้าข้อมูลมาในรูปแบบ array ธรรมดา
+                else if (Array.isArray(data.data)) {
+                    renderViolationsList(data.data);
+                    // ไม่มี pagination สำหรับข้อมูลแบบ array ธรรมดา
+                    const paginationContainer = document.querySelector('#violationTypesList .pagination');
+                    if (paginationContainer) paginationContainer.innerHTML = '';
+                }
+                else {
+                    // ถ้าโครงสร้างข้อมูลไม่ตรงกับที่คาดหวัง
+                    renderViolationsList([]);
+                }
+
+                violationManager.currentPage = page;
+                violationManager.searchTerm = search;
+            } else {
+                showError(data?.message || 'เกิดข้อผิดพลาดในการดึงข้อมูล');
                 renderViolationsList([]);
             }
-            
-            violationManager.currentPage = page;
-            violationManager.searchTerm = search;
-        } else {
-            showError(data?.message || 'เกิดข้อผิดพลาดในการดึงข้อมูล');
-            renderViolationsList([]);
-        }
-    })
-    .catch(error => {
-        showError('เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
-        if (loadingContainer) {
-            loadingContainer.innerHTML = `
+        })
+        .catch(error => {
+            showError('เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
+            if (loadingContainer) {
+                loadingContainer.innerHTML = `
                 <tr>
                     <td colspan="5" class="text-center py-4 text-danger">
                         <i class="fas fa-exclamation-circle fa-2x mb-3"></i>
@@ -729,30 +730,30 @@ function fetchViolations(page = 1, search = '') {
                     </td>
                 </tr>
             `;
-        }
-    });
+            }
+        });
 }
 
 // แก้ไขฟังก์ชัน renderPagination ให้ปลอดภัยยิ่งขึ้น
 function renderPagination(data) {
     const paginationContainer = document.querySelector('#violationTypesList .pagination');
-    
+
     // ตรวจสอบว่ามี container และข้อมูล pagination
     if (!paginationContainer) {
         console.warn('Pagination container not found');
         return;
     }
-    
+
     // ตรวจสอบว่าข้อมูลมี pagination properties หรือไม่
     if (!data || typeof data !== 'object' || !data.last_page || data.last_page <= 1) {
         paginationContainer.innerHTML = '';
         return;
     }
-    
+
     const currentPage = data.current_page || 1;
     const lastPage = data.last_page || 1;
     const paginationHTML = [];
-    
+
     // Previous button
     if (currentPage > 1) {
         paginationHTML.push(`
@@ -763,11 +764,11 @@ function renderPagination(data) {
             </li>
         `);
     }
-    
+
     // Page numbers
     const startPage = Math.max(1, currentPage - 2);
     const endPage = Math.min(lastPage, currentPage + 2);
-    
+
     for (let i = startPage; i <= endPage; i++) {
         paginationHTML.push(`
             <li class="page-item ${i === currentPage ? 'active' : ''}">
@@ -775,7 +776,7 @@ function renderPagination(data) {
             </li>
         `);
     }
-    
+
     // Next button
     if (currentPage < lastPage) {
         paginationHTML.push(`
@@ -786,14 +787,14 @@ function renderPagination(data) {
             </li>
         `);
     }
-    
+
     paginationContainer.innerHTML = paginationHTML.join('');
-    
+
     // Add click events (ลบ event listener เก่าก่อน)
     const newPaginationContainer = paginationContainer.cloneNode(true);
     paginationContainer.parentNode.replaceChild(newPaginationContainer, paginationContainer);
-    
-    newPaginationContainer.addEventListener('click', function(e) {
+
+    newPaginationContainer.addEventListener('click', function (e) {
         e.preventDefault();
         const pageLink = e.target.closest('[data-page]');
         if (pageLink) {
@@ -822,13 +823,13 @@ function renderViolationsList(violations) {
         console.error('Table tbody not found');
         return;
     }
-    
+
     // ตรวจสอบว่า violations เป็น array หรือไม่
     if (!Array.isArray(violations)) {
         console.error('Violations data is not an array:', violations);
         violations = [];
     }
-    
+
     if (violations.length === 0) {
         tbody.innerHTML = `
             <tr>
@@ -841,7 +842,7 @@ function renderViolationsList(violations) {
         `;
         return;
     }
-    
+
     tbody.innerHTML = violations.map(violation => {
         // ตรวจสอบความถูกต้องของข้อมูล violation
         const id = violation.violations_id || violation.id || '';
@@ -849,9 +850,9 @@ function renderViolationsList(violations) {
         const category = violation.violations_category || violation.category || '';
         const points = violation.violations_points_deducted || violation.points_deducted || 0;
         const description = violation.violations_description || violation.description || '';
-        
+
         const categoryBadge = getCategoryBadge(category);
-        
+
         return `
             <tr>
                 <td>${escapeHtml(name)}</td>
@@ -871,7 +872,7 @@ function renderViolationsList(violations) {
             </tr>
         `;
     }).join('');
-    
+
     // เพิ่ม event listeners ใหม่
     attachEditButtonListeners();
     attachDeleteButtonListeners();
@@ -887,7 +888,7 @@ function escapeHtml(text) {
         '"': '&quot;',
         "'": '&#039;'
     };
-    return text.toString().replace(/[&<>"']/g, function(m) { return map[m]; });
+    return text.toString().replace(/[&<>"']/g, function (m) { return map[m]; });
 }
 
 
@@ -898,9 +899,9 @@ function attachEditButtonListeners() {
         // ลบ event listener เดิม (ถ้ามี)
         const newButton = button.cloneNode(true);
         button.parentNode.replaceChild(newButton, button);
-        
+
         // เพิ่ม event listener ใหม่
-        newButton.addEventListener('click', function(e) {
+        newButton.addEventListener('click', function (e) {
             e.preventDefault();
             e.stopPropagation();
             const violationId = this.getAttribute('data-id');
@@ -921,9 +922,9 @@ function attachDeleteButtonListeners() {
         // ลบ event listener เดิม (ถ้ามี)
         const newButton = button.cloneNode(true);
         button.parentNode.replaceChild(newButton, button);
-        
+
         // เพิ่ม event listener ใหม่
-        newButton.addEventListener('click', function(e) {
+        newButton.addEventListener('click', function (e) {
             e.preventDefault();
             e.stopPropagation();
             const violationId = this.getAttribute('data-id');

@@ -94,13 +94,14 @@ class ClassroomController extends Controller
     // store() removed: add-class feature is fully disabled
 
     /**
-     * Return all classrooms without pagination or has(students) restriction.
+     * Return all classrooms with students, without pagination.
      * Sorted by level and room number for use in dropdowns.
      */
     public function all()
     {
         try {
-            $classes = ClassRoom::orderByRaw("FIELD(classes_level, 'ม.1','ม.2','ม.3','ม.4','ม.5','ม.6')")
+            $classes = ClassRoom::has('students') // เฉพาะห้องที่มีนักเรียน
+                ->orderByRaw("FIELD(classes_level, 'ม.1','ม.2','ม.3','ม.4','ม.5','ม.6')")
                 ->orderByRaw('CAST(classes_room_number AS UNSIGNED)')
                 ->get(['classes_id','classes_level','classes_room_number']);
 

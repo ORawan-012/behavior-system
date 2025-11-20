@@ -2305,7 +2305,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 <label class="form-label">ค้นหานักเรียน <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="behaviorStudentSearch"
                                     placeholder="พิมพ์ชื่อหรือรหัสนักเรียน..." autocomplete="off">
-                                <div id="studentResults" class="list-group mt-2" style="display: none;"></div>
+                                <div id="studentResults" class="list-group mt-2" style="display: none; max-height: 320px; overflow-y: auto;"></div>
                                 <input type="hidden" id="selectedStudentId" name="student_id" required>
                             </div>
                             <div class="col-md-4">

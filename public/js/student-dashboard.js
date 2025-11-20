@@ -9,32 +9,32 @@ let behaviorChartMobile = null;
 let violationChart = null;
 
 // Wait until DOM is fully loaded
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Show loading animation
     const loadingOverlay = document.createElement('div');
     loadingOverlay.className = 'loading-overlay';
     loadingOverlay.innerHTML = '<div class="loading-spinner"></div>';
     document.body.appendChild(loadingOverlay);
-    
+
     // Initialize components
-    setTimeout(function() {
+    setTimeout(function () {
         if (window.chartData) {
             initCharts(window.chartData);
         }
-        
+
         if (window.violationData) {
             initViolationChart(window.violationData);
         }
-        
+
         initializeEventListeners();
         handleMobileContent();
-        
+
         // Remove loading overlay with fade effect
         loadingOverlay.style.opacity = '0';
         setTimeout(() => {
             loadingOverlay.remove();
         }, 500);
-        
+
     }, 800);
 });
 
@@ -42,142 +42,117 @@ document.addEventListener('DOMContentLoaded', function() {
  * Initialize charts with provided data
  */
 function initCharts(chartData) {
-    // ใช้ข้อมูลกิจกรรมจาก window.recentActivities ถ้ามี เพื่อให้เสถียร
+    // ฟังก์ชันช่วยดึงรายการหักคะแนนจาก recent activities
     function getDeductionEvents() {
         if (Array.isArray(window.recentActivities) && window.recentActivities.length) {
             return window.recentActivities.filter(ev => ev.title && /ถูกหักคะแนน/.test(ev.title));
         }
-        // fallback DOM (กรณี script เรียกก่อนตัวแปรถูกเซ็ต)
-        const items = document.querySelectorAll('.activity-item');
-        const events = [];
-        items.forEach(item => {
-            const titleEl = item.querySelector('.activity-content p.mb-0.fw-medium');
-            const dateEl = item.querySelector('.activity-content p.text-muted');
-            if (!titleEl) return;
-            const titleText = titleEl.textContent || '';
-            if (/ถูกหักคะแนน/.test(titleText)) {
-                let dateText = '';
-                if (dateEl) {
-                    dateText = (dateEl.textContent.split('-').pop() || '').trim();
-                }
-                events.push({ title: titleText.trim(), date: dateText });
-            }
-        });
-        return events;
+        return [];
     }
 
     const deductionEvents = getDeductionEvents();
 
-    // ฟังก์ชันเสริม: กรณีมีเหตุหักคะแนนเดียว ให้แสดง 2 จุด (เริ่มต้น 100 และหลังหักเป็นคะแนนปัจจุบัน)
-    function applySingleDeductionTwoPoint(chartData, currentScore, deductionEvents) {
-        if (!chartData || !chartData.datasets || !chartData.datasets[0]) return;
-        if (deductionEvents.length !== 1 || currentScore == null) return;
-        const startLabel = chartData.labels && chartData.labels.length ? chartData.labels[0] : 'เริ่มต้น';
-        const eventLabel = deductionEvents[0].date || 'เหตุหักคะแนน';
-        chartData.labels = [startLabel, eventLabel];
-        chartData.datasets[0].data = [100, currentScore];
-    }
+    // ⚠️ ไม่ต้องปรับแต่งข้อมูลเลย - ใช้ข้อมูลจาก backend ตรงๆ
+    // Backend (StudentController.getBehaviorChartData) จะส่งข้อมูลที่ถูกต้องมาให้แล้ว
 
-    // ปรับข้อมูลกราฟให้แสดงการลดลงจาก 100 ไปยังคะแนนปัจจุบัน หรือแสดง 2 จุด (100 -> current) หากมีเหตุเดียว
-    try {
-        const currentScoreEl = document.getElementById('behavior-points');
-        const currentScore = currentScoreEl ? parseInt(currentScoreEl.textContent.trim(), 10) : null;
-        // กรณีเหตุหักคะแนนเดียว => สร้าง 2 จุด
-        if (deductionEvents.length === 1 && currentScore !== null) {
-            applySingleDeductionTwoPoint(chartData, currentScore, deductionEvents);
-        } else {
-            // เงื่อนไขเดิม: Interpolate หากข้อมูลคงที่
-            if (chartData && chartData.datasets && chartData.datasets[0] && Array.isArray(chartData.datasets[0].data)) {
-                const ds = chartData.datasets[0];
-                const dataArr = ds.data.slice();
-                const allSame = dataArr.length > 0 && dataArr.every(v => v === dataArr[0]);
-                if (currentScore !== null && currentScore < 100 && allSame && dataArr.length > 1) {
-                    const points = dataArr.length;
-                    const totalDrop = 100 - currentScore;
-                    const step = totalDrop / (points - 1);
-                    const newData = [];
-                    for (let i = 0; i < points - 1; i++) {
-                        const value = Math.max(currentScore, Math.round((100 - step * i) * 100) / 100);
-                        newData.push(value);
-                    }
-                    newData.push(currentScore);
-                    ds.data = newData;
-                } else if (dataArr.length > 0 && dataArr[0] !== 100) {
-                    if (currentScore !== null && currentScore <= dataArr[dataArr.length - 1]) {
-                        ds.data[0] = 100;
-                    }
-                }
-            }
-        }
-        if (chartData && chartData.datasets && chartData.datasets[0] && Array.isArray(chartData.datasets[0].data)) {
-            const ds = chartData.datasets[0];
-            const dataArr = ds.data.slice();
-            const allSame = dataArr.length > 0 && dataArr.every(v => v === dataArr[0]);
-            // เงื่อนไข: คะแนนปัจจุบัน < 100 และข้อมูลที่ได้มาทั้งหมดเป็น 100 (หรือค่าเดียวกัน) และมีมากกว่า 1 จุด
-            if (currentScore !== null && currentScore < 100 && allSame && dataArr.length > 1) {
-                const points = dataArr.length;
-                const totalDrop = 100 - currentScore;
-                const step = totalDrop / (points - 1);
-                const newData = [];
-                for (let i = 0; i < points - 1; i++) {
-                    const value = Math.max(currentScore, Math.round((100 - step * i) * 100) / 100);
-                    newData.push(value);
-                }
-                // จุดสุดท้าย = คะแนนปัจจุบันจริง
-                newData.push(currentScore);
-                ds.data = newData;
-            } else if (dataArr.length > 0 && dataArr[0] !== 100) {
-                // หากจุดเริ่มต้นไม่ใช่ 100 แต่เราต้องการให้เริ่มที่ 100 (ตาม requirement) และข้อมูลยังไม่ลดลง
-                if (currentScore !== null && currentScore <= dataArr[dataArr.length - 1]) {
-                    ds.data[0] = 100;
-                }
-            }
-        }
-    } catch (e) {
-        console.warn('Chart data adjustment failed:', e);
-    }
+    // ตรวจสอบข้อมูลจริงเพื่อปรับ scale ให้เหมาะสม
+    const dataPoints = chartData && chartData.datasets && chartData.datasets[0] ? chartData.datasets[0].data : [];
+    const values = dataPoints.filter(v => v != null && !isNaN(v));
+    const minScore = values.length > 0 ? Math.min(...values) : 0;
+    const maxScore = values.length > 0 ? Math.max(...values) : 100;
+
+    // คำนวณ scale ที่เหมาะสม
+    const scoreRange = maxScore - minScore;
+    const yMin = scoreRange > 50 ? 0 : Math.max(0, minScore - 10);
+    const yMax = scoreRange > 50 ? 100 : Math.min(100, maxScore + 10);
 
     const options = {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: {
+            mode: 'nearest',
+            intersect: false
+        },
         scales: {
             y: {
-                beginAtZero: true, // เริ่มที่ 0
-                min: 0,
-                max: 100, // สูงสุด 100
+                beginAtZero: false,
+                min: yMin,
+                max: yMax,
                 ticks: {
-                    stepSize: 20
+                    stepSize: 10,
+                    callback: function (value) {
+                        return value + ' คะแนน';
+                    },
+                    font: {
+                        family: 'Prompt',
+                        size: 11
+                    }
+                },
+                grid: {
+                    color: 'rgba(0, 0, 0, 0.05)'
+                }
+            },
+            x: {
+                ticks: {
+                    font: {
+                        family: 'Prompt',
+                        size: 11
+                    },
+                    maxRotation: 45,
+                    minRotation: 0
+                },
+                grid: {
+                    display: false
                 }
             }
         },
         plugins: {
             legend: {
-                display: chartData.datasets.length > 1, // แสดงเมื่อมีหลาย dataset
-                position: 'top'
+                display: chartData.datasets.length > 1,
+                position: 'top',
+                labels: {
+                    font: {
+                        family: 'Prompt',
+                        size: 12
+                    }
+                }
             },
             tooltip: {
+                enabled: true,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                titleFont: {
+                    family: 'Prompt',
+                    size: 13
+                },
+                bodyFont: {
+                    family: 'Prompt',
+                    size: 12
+                },
+                padding: 12,
+                displayColors: false,
                 callbacks: {
-                    label: function(context) {
-                        let label = context.dataset.label || '';
-                        if (label) {
-                            label += ': ';
-                        }
+                    title: function (context) {
+                        return context[0].label || '';
+                    },
+                    label: function (context) {
                         if (context.parsed.y !== null) {
-                            label += `${context.parsed.y} คะแนน`;
+                            return `คะแนน: ${context.parsed.y}`;
                         }
-                        return label;
+                        return '';
                     }
                 }
             }
         },
         elements: {
             line: {
-                tension: 0.3, // ทำให้เส้นโค้งเล็กน้อย
+                tension: 0.4, // เส้นโค้งนุ่มนวล
                 borderWidth: 3,
             },
             point: {
-                radius: 5,
-                hoverRadius: 7
+                radius: 4,
+                hoverRadius: 6,
+                hitRadius: 10,
+                borderWidth: 2
             }
         }
     };
@@ -186,7 +161,7 @@ function initCharts(chartData) {
     const createGradient = (ctx) => {
         if (!ctx || !ctx.canvas) return 'rgba(59, 130, 246, 0.1)';
         const chart = ctx.canvas.getContext('2d');
-        if(!chart) return 'rgba(59, 130, 246, 0.1)';
+        if (!chart) return 'rgba(59, 130, 246, 0.1)';
         const gradient = chart.createLinearGradient(0, 0, 0, ctx.canvas.height);
         gradient.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
         gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
@@ -199,13 +174,13 @@ function initCharts(chartData) {
         if (behaviorChart) {
             behaviorChart.destroy();
         }
-        
+
         const desktopChartCtx = desktopCtx.getContext('2d');
         const gradient = createGradient(desktopChartCtx);
 
         // เพิ่มสีพื้นหลังให้ dataset
         const desktopData = JSON.parse(JSON.stringify(chartData)); // Deep copy
-        if(desktopData.datasets[0]){
+        if (desktopData.datasets[0]) {
             desktopData.datasets[0].fill = true;
             desktopData.datasets[0].backgroundColor = gradient;
         }
@@ -215,22 +190,8 @@ function initCharts(chartData) {
             data: desktopData,
             options: { ...options, plugins: { ...options.plugins, legend: { display: false } } }
         });
-
-        // บังคับปรับหลังสร้าง (กันกรณี DOM ไม่พร้อม) หากเหตุเดียว -> 2 จุด
-        if (deductionEvents.length === 1) {
-            try {
-                const currentScoreEl = document.getElementById('behavior-points');
-                const currentScore = currentScoreEl ? parseInt(currentScoreEl.textContent.trim(), 10) : null;
-                if (currentScore !== null) {
-                    applySingleDeductionTwoPoint(behaviorChart.data, currentScore, deductionEvents);
-                    behaviorChart.update();
-                }
-            } catch (err) {
-                console.warn('Single-point override failed (desktop):', err);
-            }
-        }
     }
-    
+
     // Mobile Chart
     const mobileCtx = document.getElementById('behaviorChartMobile');
     if (mobileCtx) {
@@ -242,29 +203,16 @@ function initCharts(chartData) {
         const mobileGradient = createGradient(mobileChartCtx);
 
         const mobileData = JSON.parse(JSON.stringify(chartData)); // Deep copy
-        if(mobileData.datasets[0]){
+        if (mobileData.datasets[0]) {
             mobileData.datasets[0].fill = true;
             mobileData.datasets[0].backgroundColor = mobileGradient;
         }
-        
+
         behaviorChartMobile = new Chart(mobileChartCtx, {
             type: 'line',
             data: mobileData,
             options: { ...options, plugins: { ...options.plugins, legend: { display: false } } }
         });
-
-        if (deductionEvents.length === 1) {
-            try {
-                const currentScoreEl = document.getElementById('behavior-points');
-                const currentScore = currentScoreEl ? parseInt(currentScoreEl.textContent.trim(), 10) : null;
-                if (currentScore !== null) {
-                    applySingleDeductionTwoPoint(behaviorChartMobile.data, currentScore, deductionEvents);
-                    behaviorChartMobile.update();
-                }
-            } catch (err) {
-                console.warn('Single-point override failed (mobile):', err);
-            }
-        }
     }
 }
 
@@ -278,7 +226,7 @@ function initViolationChart(violationData) {
         if (violationChart) {
             violationChart.destroy();
         }
-        
+
         violationChart = new Chart(violationCtx.getContext('2d'), {
             type: 'doughnut',
             data: {
@@ -307,15 +255,15 @@ function initViolationChart(violationData) {
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 const label = context.label || '';
                                 const value = context.parsed;
-                                
+
                                 // ถ้าเป็นข้อมูลว่าง
                                 if (label === 'ไม่มีข้อมูล') {
                                     return 'ยังไม่มีข้อมูลพฤติกรรม';
                                 }
-                                
+
                                 const total = context.dataset.data.reduce((a, b) => a + b, 0);
                                 const percentage = ((value / total) * 100).toFixed(1);
                                 return `${label}: ${value} ครั้ง (${percentage}%)`;
@@ -350,13 +298,13 @@ function initializeEventListeners() {
     // Bottom navbar active state (mobile)
     const mobileNavLinks = document.querySelectorAll('.bottom-navbar .nav-link');
     mobileNavLinks.forEach(link => {
-        link.addEventListener('click', function() {
+        link.addEventListener('click', function () {
             // Remove active class from all links
             mobileNavLinks.forEach(l => {
                 l.classList.remove('text-primary-app');
                 l.classList.add('text-muted');
             });
-            
+
             // Add active class to clicked link
             this.classList.remove('text-muted');
             this.classList.add('text-primary-app');
@@ -366,24 +314,24 @@ function initializeEventListeners() {
     // Desktop navbar active state - แบบเรียบง่ายไม่มี effects
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
-        item.addEventListener('click', function() {
+        item.addEventListener('click', function () {
             // Remove active class from all items
             navItems.forEach(navItem => {
                 navItem.classList.remove('active');
             });
-            
+
             // Add active class to this item
             this.classList.add('active');
         });
     });
-    
+
     // Add responsive handling for window resizing
-    window.addEventListener('resize', function() {
+    window.addEventListener('resize', function () {
         // Adjust charts if needed
         const desktopChart = Chart.getChart('behaviorChart');
         const mobileChart = Chart.getChart('behaviorChartMobile');
         const violationChartInstance = Chart.getChart('violationChart');
-        
+
         if (desktopChart) desktopChart.resize();
         if (mobileChart) mobileChart.resize();
         if (violationChartInstance) violationChartInstance.resize();
@@ -397,7 +345,7 @@ function toggleUserMenu() {
     const userMenu = document.getElementById('userMenu');
     if (userMenu) {
         userMenu.classList.toggle('show');
-        
+
         // Close menu when clicking outside
         if (userMenu.classList.contains('show')) {
             document.addEventListener('click', closeUserMenuOnClickOutside);
@@ -413,7 +361,7 @@ function toggleUserMenu() {
 function closeUserMenuOnClickOutside(event) {
     const userMenu = document.getElementById('userMenu');
     const userProfile = document.querySelector('.user-profile');
-    
+
     if (userMenu && !userMenu.contains(event.target) && !userProfile.contains(event.target)) {
         userMenu.classList.remove('show');
         document.removeEventListener('click', closeUserMenuOnClickOutside);

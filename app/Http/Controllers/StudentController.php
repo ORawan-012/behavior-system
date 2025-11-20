@@ -519,117 +519,155 @@ class StudentController extends Controller
     }
     
     /**
-     * ดึงข้อมูลกราฟพฤติกรรมจากฐานข้อมูลจริง
-     */
-    private function getBehaviorChartData($studentId)
-    {
-        if (!$studentId) {
+ * ดึงข้อมูลกราฟพฤติกรรมจากฐานข้อมูลจริง (แสดงประวัติการหักคะแนนแต่ละครั้ง)
+ */
+private function getBehaviorChartData($studentId)
+{
+    if (!$studentId) {
+        return $this->getEmptyChartData();
+    }
+
+    try {
+        // ดึงข้อมูลนักเรียน
+        $student = DB::table('tb_students')
+            ->where('students_id', $studentId)
+            ->first();
+        
+        if (!$student) {
             return $this->getEmptyChartData();
         }
 
-        try {
-            $academicYearService = app(\App\Services\AcademicYearService::class);
-            $currentSemester = $academicYearService->getCurrentSemester();
-            $currentAcademicYear = $academicYearService->getCurrentAcademicYear();
+        $currentScore = $student->students_current_score ?? 100;
+        $currentYear = date('Y');
 
-            // Define months for each semester based on config
-            $semester1Config = config('academic.semester_periods.1');
-            $semester2Config = config('academic.semester_periods.2');
+        // ดึงรายการหักคะแนนทั้งหมดในปีปัจจุบัน เรียงตามวันที่
+        $reports = DB::table('tb_behavior_reports as br')
+            ->leftJoin('tb_violations as v', 'br.violation_id', '=', 'v.violations_id')
+            ->where('br.student_id', $studentId)
+            ->whereYear('br.reports_report_date', $currentYear)
+            ->select(
+                'br.reports_report_date',
+                'br.reports_points_deducted',
+                'v.violations_name'
+            )
+            ->orderBy('br.reports_report_date', 'asc')
+            ->get();
 
-            $semesterMonths = [];
-            if ($currentSemester == 1) {
-                // Term 1: May to October
-                for ($m = $semester1Config['start_month']; $m <= $semester1Config['end_month']; $m++) {
-                    $semesterMonths[] = $m;
-                }
-            } else {
-                // Term 2: November to May of next year
-                for ($m = $semester2Config['start_month']; $m <= 12; $m++) {
-                    $semesterMonths[] = $m;
-                }
-                for ($m = 1; $m <= $semester2Config['end_month']; $m++) {
-                    $semesterMonths[] = $m;
-                }
-            }
-
-            $now = Carbon::now();
-            $labels = [];
-            $scores = [];
-            
-            $reports = DB::table('tb_behavior_reports')
-                ->where('student_id', $studentId)
-                ->where('reports_academic_year', $currentAcademicYear)
-                ->select('reports_report_date', 'reports_points_deducted')
-                ->orderBy('reports_report_date', 'asc')
-                ->get()
-                ->map(function ($report) {
-                    return [
-                        'date' => Carbon::parse($report->reports_report_date),
-                        'points' => abs((int)$report->reports_points_deducted)
-                    ];
-                });
-
-            $lastMonthScore = 100;
-
-            foreach ($semesterMonths as $month) {
-                $year = $currentAcademicYear;
-                if ($currentSemester == 2 && $month < $semester2Config['start_month']) {
-                    $year = $currentAcademicYear + 1;
-                }
-
-                $dateInMonth = Carbon::createFromDate($year, $month, 1)->endOfMonth();
-
-                if ($dateInMonth->isFuture() && !$dateInMonth->isSameMonth($now)) {
-                    continue;
-                }
-
-                $deductionForMonth = $reports
-                    ->where('date.month', $month)
-                    ->where('date.year', $year)
-                    ->sum('points');
-                
-                $currentMonthScore = max(0, $lastMonthScore - $deductionForMonth);
-
-                $labels[] = $academicYearService->getThaiMonth($month) . ' ' . substr($year + 543, -2);
-                $scores[] = $currentMonthScore;
-
-                $lastMonthScore = $currentMonthScore;
-            }
-
-            if (empty($labels)) {
-                $currentScore = DB::table('tb_students')->where('students_id', $studentId)->value('students_current_score') ?? 100;
-                return [
-                    'labels' => ['ปัจจุบัน'],
-                    'datasets' => [
-                        [
-                            'label' => 'คะแนน',
-                            'data' => [$currentScore],
-                            'borderColor' => '#3b82f6',
-                            'backgroundColor' => 'rgba(59, 130, 246, 0.1)',
-                            'tension' => 0.3
-                        ]
-                    ]
-                ];
-            }
-
+        // ถ้าไม่มีรายการหักคะแนนเลย
+        if ($reports->isEmpty()) {
             return [
-                'labels' => $labels,
+                'labels' => ['เริ่มต้น'],
                 'datasets' => [
                     [
-                        'label' => 'คะแนนสะสม',
-                        'data' => $scores,
+                        'label' => 'คะแนนความประพฤติ',
+                        'data' => [$currentScore],
                         'borderColor' => '#3b82f6',
                         'backgroundColor' => 'rgba(59, 130, 246, 0.1)',
-                        'tension' => 0.3
+                        'tension' => 0.4,
+                        'fill' => true,
+                        'pointRadius' => 5,
+                        'pointHoverRadius' => 7
                     ]
                 ]
             ];
+        }
 
-        } catch (\Exception $e) {
-            Log::error('Error getting chart data for student ' . $studentId . ': ' . $e->getMessage() . ' on line ' . $e->getLine());
-            return $this->getEmptyChartData();
+        // สร้างข้อมูลกราฟ: เริ่มจาก 100 แล้วลดลงตามการหักคะแนนแต่ละครั้ง
+        $labels = [];
+        $scores = [];
+        $runningScore = 100;
+
+        // จุดเริ่มต้น
+        $labels[] = 'เริ่มต้น';
+        $scores[] = 100;
+
+        // แต่ละครั้งที่ถูกหักคะแนน
+        foreach ($reports as $index => $report) {
+            $pointsDeducted = abs((int)$report->reports_points_deducted);
+            $runningScore = max(0, $runningScore - $pointsDeducted);
+            
+            // สร้าง label จากวันที่และชื่อพฤติกรรม
+            $date = \Carbon\Carbon::parse($report->reports_report_date);
+            $dateStr = $date->format('d/m');
+            $violationName = $report->violations_name ?? 'หักคะแนน';
+            
+            // ตัดชื่อพฤติกรรมถ้ายาวเกินไป
+            if (mb_strlen($violationName) > 15) {
+                $violationName = mb_substr($violationName, 0, 15) . '...';
+            }
+            
+            $label = $dateStr . ' - ' . $violationName;
+            
+            $labels[] = $label;
+            $scores[] = $runningScore;
+        }
+
+        // จำกัดจำนวนจุดไม่เกิน 10 จุด (รวมจุดเริ่มต้น)
+        if (count($labels) > 10) {
+            $sampled = $this->sampleChartData($labels, $scores, 10);
+            $labels = $sampled['labels'];
+            $scores = $sampled['scores'];
+        }
+
+        return [
+            'labels' => $labels,
+            'datasets' => [
+                [
+                    'label' => 'คะแนนความประพฤติ',
+                    'data' => $scores,
+                    'borderColor' => '#3b82f6',
+                    'backgroundColor' => 'rgba(59, 130, 246, 0.1)',
+                    'tension' => 0.4,
+                    'fill' => true,
+                    'pointRadius' => 5,
+                    'pointHoverRadius' => 7
+                ]
+            ]
+        ];
+
+    } catch (\Exception $e) {
+        Log::error('Error in getBehaviorChartData: ' . $e->getMessage());
+        Log::error('Stack trace: ' . $e->getTraceAsString());
+        return $this->getEmptyChartData();
+    }
+}
+
+/**
+ * Sample chart data เพื่อลดจำนวนจุดบนกราฟ
+ */
+private function sampleChartData($labels, $scores, $maxPoints)
+{
+    $totalPoints = count($labels);
+    
+    if ($totalPoints <= $maxPoints) {
+        return ['labels' => $labels, 'scores' => $scores];
+    }
+
+    $sampledLabels = [];
+    $sampledScores = [];
+    
+    // เก็บจุดแรกเสมอ (เริ่มต้น)
+    $sampledLabels[] = $labels[0];
+    $sampledScores[] = $scores[0];
+    
+    // คำนวณ step สำหรับ sampling
+    $step = ($totalPoints - 2) / ($maxPoints - 2);
+    
+    // Sample จุดตรงกลาง
+    for ($i = 1; $i < $maxPoints - 1; $i++) {
+        $index = (int)round($i * $step);
+        if ($index < $totalPoints - 1) {
+            $sampledLabels[] = $labels[$index];
+            $sampledScores[] = $scores[$index];
         }
     }
+    
+    // เก็บจุดสุดท้ายเสมอ (คะแนนปัจจุบัน)
+    $sampledLabels[] = $labels[$totalPoints - 1];
+    $sampledScores[] = $scores[$totalPoints - 1];
+    
+    return ['labels' => $sampledLabels, 'scores' => $sampledScores];
+}
 
     private function getEmptyChartData()
     {

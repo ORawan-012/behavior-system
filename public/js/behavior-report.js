@@ -10,7 +10,7 @@ const behaviorReport = {
 };
 
 // เริ่มต้นระบบเมื่อ DOM โหลดเสร็จ
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     initializeBehaviorReport();
 });
 
@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeBehaviorReport() {
     setupEventListeners();
     loadViolationTypes();
+    loadClassroomOptions();
     setDefaultDateTime();
     loadRecentReports();
 }
@@ -32,16 +33,16 @@ function setupEventListeners() {
     const classFilter = document.getElementById('classFilter');
     const violationType = document.getElementById('violationType');
     const saveBtn = document.getElementById('saveViolationBtn');
-    
+
     // ค้นหานักเรียน
     if (studentSearch) {
         let searchTimeout;
-        
+
         // เมื่อพิมพ์ในช่องค้นหา
-        studentSearch.addEventListener('input', function() {
+        studentSearch.addEventListener('input', function () {
             clearTimeout(searchTimeout);
             const searchValue = this.value.trim();
-            
+
             // ค้นหาทันทีถ้ามีข้อความ 1 ตัวอักษรขึ้นไป
             if (searchValue.length >= 1) {
                 searchTimeout = setTimeout(() => {
@@ -51,9 +52,9 @@ function setupEventListeners() {
                 hideStudentResults();
             }
         });
-        
+
         // เมื่อกด Enter
-        studentSearch.addEventListener('keypress', function(e) {
+        studentSearch.addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 clearTimeout(searchTimeout);
@@ -63,51 +64,62 @@ function setupEventListeners() {
                 }
             }
         });
-        
+
         // Focus ช่องค้นหาเมื่อเปิด modal
         const modal = document.getElementById('newViolationModal');
         if (modal) {
-            modal.addEventListener('shown.bs.modal', function() {
+            modal.addEventListener('shown.bs.modal', function () {
                 studentSearch.focus();
             });
         }
     }
-    
+
+
     // กรองตามห้อง
     if (classFilter) {
-        classFilter.addEventListener('change', function() {
+        classFilter.addEventListener('change', function () {
             const searchInput = document.getElementById('behaviorStudentSearch');
-            if (searchInput && searchInput.value.length >= 2) {
+            const selectedClassId = this.value;
+
+            // ถ้าเลือกห้อง ให้แสดงนักเรียนในห้องนั้นทันที
+            if (selectedClassId) {
+                // ค้นหาด้วยคำว่า "" (ค้นหาทั้งหมด) แต่กรองตามห้อง
+                searchStudents('');
+            } else if (searchInput && searchInput.value.length >= 2) {
+                // ถ้าไม่เลือกห้อง แต่มีการพิมพ์ค้นหา ให้ค้นหาตามปกติ
                 searchStudents(searchInput.value);
+            } else {
+                // ถ้าไม่เลือกห้อง และไม่มีการพิมพ์ค้นหา ให้ซ่อนผลลัพธ์
+                hideStudentResults();
             }
         });
     }
-    
+
     // เปลี่ยนประเภทพฤติกรรม
     if (violationType) {
-        violationType.addEventListener('change', function() {
+        violationType.addEventListener('change', function () {
             updatePointsDeducted(this.value);
         });
     }
-    
+
     // บันทึกข้อมูล (ใช้เฉพาะไฟล์นี้เท่านั้น - ไม่ให้ teacher-dashboard.js ทำงานร่วม)
     if (saveBtn && !saveBtn.hasAttribute('data-listener-attached')) {
         // ลบ event listener อื่น ๆ ที่อาจมี (จาก teacher-dashboard.js)
         const newBtn = saveBtn.cloneNode(true);
         saveBtn.parentNode.replaceChild(newBtn, saveBtn);
-        
-        newBtn.addEventListener('click', function(e) {
+
+        newBtn.addEventListener('click', function (e) {
             e.preventDefault();
             e.stopPropagation();
             saveBehaviorReport();
         });
         newBtn.setAttribute('data-listener-attached', 'behavior-report');
     }
-    
+
     // รีเซ็ตฟอร์มเมื่อปิด modal
     const modal = document.getElementById('newViolationModal');
     if (modal) {
-        modal.addEventListener('hidden.bs.modal', function() {
+        modal.addEventListener('hidden.bs.modal', function () {
             resetForm();
         });
     }
@@ -130,23 +142,26 @@ function searchStudents(searchTerm) {
     const classFilter = document.getElementById('classFilter');
     const classId = classFilter ? classFilter.value : '';
     const resultsContainer = document.getElementById('studentResults');
-    
+
     if (!resultsContainer) return;
-    
-    // ถ้าคำค้นหาสั้นเกินไป ให้ซ่อนผลลัพธ์
-    if (!searchTerm || searchTerm.trim().length < 1) {
+
+    // แปลง searchTerm ให้เป็น string เสมอ
+    const searchQuery = (searchTerm || '').trim();
+
+    // ถ้าไม่มีคำค้นหาและไม่มีการเลือกห้อง ให้ซ่อนผลลัพธ์
+    if (searchQuery.length < 1 && !classId) {
         resultsContainer.style.display = 'none';
         return;
     }
-    
+
     // แสดง loading
     resultsContainer.innerHTML = '<div class="list-group-item"><i class="fas fa-spinner fa-spin me-2"></i>กำลังค้นหา...</div>';
     resultsContainer.style.display = 'block';
-    
+
     // เพิ่ม CSRF token
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    
-    fetch(`/api/behavior-reports/students/search?term=${encodeURIComponent(searchTerm.trim())}&class_id=${classId}`, {
+
+    fetch(`/api/behavior-reports/students/search?term=${encodeURIComponent(searchQuery)}&class_id=${classId}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -178,16 +193,16 @@ function searchStudents(searchTerm) {
  */
 function displayStudentResults(students) {
     const resultsContainer = document.getElementById('studentResults');
-    
+
     if (!resultsContainer) return;
-    
+
     if (students.length === 0) {
         resultsContainer.innerHTML = '<div class="list-group-item text-muted">ไม่พบนักเรียนที่ตรงกับคำค้นหา</div>';
         return;
     }
-    
+
     resultsContainer.innerHTML = '';
-    
+
     students.forEach(student => {
         const item = document.createElement('div');
         item.className = 'list-group-item list-group-item-action';
@@ -203,11 +218,11 @@ function displayStudentResults(students) {
                 </div>
             </div>
         `;
-        
-        item.addEventListener('click', function() {
+
+        item.addEventListener('click', function () {
             selectStudent(student);
         });
-        
+
         resultsContainer.appendChild(item);
     });
 }
@@ -217,14 +232,14 @@ function displayStudentResults(students) {
  */
 function selectStudent(student) {
     behaviorReport.selectedStudent = student;
-    
+
     // ซ่อนผลการค้นหา
     hideStudentResults();
-    
+
     // แสดงข้อมูลนักเรียนที่เลือก
     const selectedInfo = document.getElementById('selectedStudentInfo');
     const infoDisplay = document.getElementById('studentInfoDisplay');
-    
+
     if (selectedInfo && infoDisplay) {
         infoDisplay.innerHTML = `
             <strong>${student.name}</strong> 
@@ -232,21 +247,69 @@ function selectStudent(student) {
             ห้อง: ${student.class} 
             คะแนนปัจจุบัน: <span class="badge bg-primary">${student.current_score}</span>
         `;
-        
+
         selectedInfo.style.display = 'block';
     }
-    
+
     // ตั้งค่า hidden input
     const selectedStudentId = document.getElementById('selectedStudentId');
     if (selectedStudentId) {
         selectedStudentId.value = student.id;
     }
-    
+
     // เคลียร์ช่องค้นหา
     const searchInput = document.getElementById('behaviorStudentSearch');
     if (searchInput) {
         searchInput.value = student.name;
     }
+}
+
+/**
+ * โหลดตัวเลือกห้องเรียนสำหรับกรอง
+ */
+function loadClassroomOptions() {
+    const classFilter = document.getElementById('classFilter');
+
+    if (!classFilter) return;
+
+    // ดึงข้อมูลห้องเรียนจาก API (เฉพาะห้องที่มีนักเรียน)
+    fetch('/api/classes/all', {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                const classrooms = Array.isArray(data.data) ? data.data :
+                    (data.data && Array.isArray(data.data.data) ? data.data.data : []);
+
+                // เคลียร์ตัวเลือกเดิม (เว้น option แรก "ทุกห้อง")
+                while (classFilter.children.length > 1) {
+                    classFilter.removeChild(classFilter.lastChild);
+                }
+
+                // เพิ่มตัวเลือกห้องเรียน
+                classrooms.forEach(classroom => {
+                    const option = document.createElement('option');
+                    option.value = classroom.classes_id;
+                    // แสดงในรูปแบบ "ม.1/1" หรือ "ป.6/2"
+                    option.textContent = `${classroom.classes_level}/${classroom.classes_room_number}`;
+                    classFilter.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error loading classrooms:', error.message);
+            // ไม่แสดง error ให้ผู้ใช้เห็น เพราะไม่ critical
+        });
 }
 
 /**
@@ -263,7 +326,7 @@ function loadViolationTypes() {
         .then(data => {
             // ตรวจสอบโครงสร้างข้อมูลที่ได้รับ
             let violationsArray = [];
-            
+
             if (data.success && Array.isArray(data.data)) {
                 violationsArray = data.data;
             } else if (Array.isArray(data)) {
@@ -273,7 +336,7 @@ function loadViolationTypes() {
             } else {
                 throw new Error('ข้อมูลประเภทพฤติกรรมไม่ถูกต้อง');
             }
-            
+
             // กรองซ้ำ (กันกรณี API หรือสคริปต์อื่นเพิ่มมาซ้ำ) โดยใช้ key = name(lower) + id
             const uniqueMap = new Map();
             violationsArray.forEach(v => {
@@ -301,17 +364,17 @@ function loadViolationTypes() {
  */
 function updateViolationSelect(violations) {
     const select = document.getElementById('violationType');
-    
+
     if (!select) return;
     // ถ้ามี optgroup หรือ option จากสคริปต์อื่น ให้เคลียร์ทั้งหมด (ยกเว้น placeholder ตัวแรกถ้ามี)
     const placeholderText = select.options.length ? select.options[0].textContent : 'เลือกประเภทพฤติกรรม';
     select.innerHTML = `<option value="">${placeholderText}</option>`;
-    
+
     if (!Array.isArray(violations)) {
         console.error('violations ต้องเป็น array');
         return;
     }
-    
+
     const frag = document.createDocumentFragment();
     const addedNames = new Set();
     violations.forEach(violation => {
@@ -369,11 +432,11 @@ document.addEventListener('DOMContentLoaded', () => {
 function updatePointsDeducted(violationId) {
     const pointsInput = document.getElementById('pointsDeducted');
     const select = document.getElementById('violationType');
-    
+
     if (!pointsInput || !select) return;
-    
+
     const selectedOption = select.options[select.selectedIndex];
-    
+
     if (selectedOption && selectedOption.dataset.points) {
         pointsInput.value = selectedOption.dataset.points;
     } else {
@@ -388,12 +451,12 @@ function setDefaultDateTime() {
     const now = new Date();
     const dateInput = document.getElementById('violationDate');
     const timeInput = document.getElementById('violationTime');
-    
+
     if (dateInput) {
         dateInput.value = now.toISOString().split('T')[0];
         dateInput.max = now.toISOString().split('T')[0];
     }
-    
+
     if (timeInput) {
         timeInput.value = now.toTimeString().slice(0, 5);
     }
@@ -409,27 +472,27 @@ function saveBehaviorReport() {
     if (!validateForm()) {
         return;
     }
-    
+
     // ป้องกันการกดซ้ำขณะกำลังประมวลผล
     if (isSubmitting) {
         return;
     }
-    
+
     const saveBtn = document.getElementById('saveViolationBtn');
     if (!saveBtn) return;
-    
+
     // ป้องกันการกดซ้ำขณะกำลังประมวลผล
     if (saveBtn.disabled) {
         return;
     }
-    
+
     isSubmitting = true;
     const originalText = saveBtn.innerHTML;
-    
+
     // แสดง loading
     saveBtn.disabled = true;
     saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> กำลังบันทึก...';
-    
+
     // เตรียมข้อมูล
     const formData = new FormData();
     formData.append('student_id', document.getElementById('selectedStudentId')?.value || '');
@@ -437,20 +500,20 @@ function saveBehaviorReport() {
     formData.append('violation_date', document.getElementById('violationDate')?.value || '');
     formData.append('violation_time', document.getElementById('violationTime')?.value || '');
     formData.append('description', document.getElementById('violationDescription')?.value || '');
-    
+
     // รวมวันที่และเวลา
     const date = document.getElementById('violationDate')?.value;
     const time = document.getElementById('violationTime')?.value;
     if (date && time) {
         formData.append('violation_datetime', `${date} ${time}`);
     }
-    
+
     // แนบไฟล์หลักฐาน
     const evidenceFile = document.getElementById('evidenceFile')?.files[0];
     if (evidenceFile) {
         formData.append('evidence', evidenceFile);
     }
-    
+
     // ส่งข้อมูล
     fetch('/api/behavior-reports', {
         method: 'POST',
@@ -460,35 +523,35 @@ function saveBehaviorReport() {
         },
         body: formData
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.success) {
-            showSuccess('บันทึกพฤติกรรมเรียบร้อยแล้ว');
-            resetForm();
-            loadRecentReports();
-            // ปิด modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('newViolationModal'));
-            if (modal) {
-                modal.hide();
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-        } else {
-            showError(data.message || 'เกิดข้อผิดพลาดในการบันทึก');
-        }
-    })
-    .catch(error => {
-        showError('เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
-    })
-    .finally(() => {
-        // คืนสถานะปุ่ม
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = originalText;
-        isSubmitting = false; // รีเซ็ต flag
-    });
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                showSuccess('บันทึกพฤติกรรมเรียบร้อยแล้ว');
+                resetForm();
+                loadRecentReports();
+                // ปิด modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('newViolationModal'));
+                if (modal) {
+                    modal.hide();
+                }
+            } else {
+                showError(data.message || 'เกิดข้อผิดพลาดในการบันทึก');
+            }
+        })
+        .catch(error => {
+            showError('เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
+        })
+        .finally(() => {
+            // คืนสถานะปุ่ม
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalText;
+            isSubmitting = false; // รีเซ็ต flag
+        });
 }
 
 /**
@@ -497,35 +560,35 @@ function saveBehaviorReport() {
 function validateForm() {
     let isValid = true;
     const errors = [];
-    
+
     // ตรวจสอบการเลือกนักเรียน
     if (!document.getElementById('selectedStudentId')?.value) {
         errors.push('กรุณาเลือกนักเรียน');
         isValid = false;
     }
-    
+
     // ตรวจสอบประเภทพฤติกรรม
     if (!document.getElementById('violationType')?.value) {
         errors.push('กรุณาเลือกประเภทพฤติกรรม');
         isValid = false;
     }
-    
+
     // ตรวจสอบวันที่
     if (!document.getElementById('violationDate')?.value) {
         errors.push('กรุณาระบุวันที่เกิดเหตุการณ์');
         isValid = false;
     }
-    
+
     // ตรวจสอบเวลา
     if (!document.getElementById('violationTime')?.value) {
         errors.push('กรุณาระบุเวลาที่เกิดเหตุการณ์');
         isValid = false;
     }
-    
+
     if (!isValid) {
         showError(errors.join('<br>'));
     }
-    
+
     return isValid;
 }
 
@@ -537,22 +600,22 @@ function resetForm() {
     if (form) {
         form.reset();
     }
-    
+
     const selectedStudentId = document.getElementById('selectedStudentId');
     if (selectedStudentId) {
         selectedStudentId.value = '';
     }
-    
+
     const pointsDeducted = document.getElementById('pointsDeducted');
     if (pointsDeducted) {
         pointsDeducted.value = '0';
     }
-    
+
     const selectedStudentInfo = document.getElementById('selectedStudentInfo');
     if (selectedStudentInfo) {
         selectedStudentInfo.style.display = 'none';
     }
-    
+
     hideStudentResults();
     behaviorReport.selectedStudent = null;
     setDefaultDateTime();
@@ -563,9 +626,9 @@ function resetForm() {
  */
 function loadRecentReports() {
     const tableBody = document.getElementById('recentViolationsTable');
-    
+
     if (!tableBody) return;
-    
+
     // แสดง loading
     tableBody.innerHTML = `
         <tr>
@@ -575,7 +638,7 @@ function loadRecentReports() {
             </td>
         </tr>
     `;
-    
+
     fetch('/api/behavior-reports/recent?limit=10')
         .then(response => {
             if (!response.ok) {
@@ -583,7 +646,7 @@ function loadRecentReports() {
             }
             return response.json();
         })
-        .then (data => {
+        .then(data => {
             if (data.success) {
                 displayRecentReports(data.data);
             } else {
@@ -612,9 +675,9 @@ function loadRecentReports() {
  */
 function displayRecentReports(reports) {
     const tableBody = document.getElementById('recentViolationsTable');
-    
+
     if (!tableBody) return;
-    
+
     if (reports.length === 0) {
         tableBody.innerHTML = `
             <tr>
@@ -628,9 +691,9 @@ function displayRecentReports(reports) {
         `;
         return;
     }
-    
+
     tableBody.innerHTML = '';
-    
+
     reports.forEach(report => {
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -661,10 +724,10 @@ function showViolationDetail(reportId) {
     // แสดง modal
     const modal = new bootstrap.Modal(document.getElementById('violationDetailModal'));
     modal.show();
-    
+
     // แสดง loading state
     showViolationDetailLoading();
-    
+
     // ดึงข้อมูล
     fetch(`/api/behavior-reports/${reportId}`)
         .then(response => {
@@ -718,12 +781,12 @@ function displayViolationDetail(data) {
     // ซ่อน loading และ error
     document.getElementById('violationDetailLoading').style.display = 'none';
     document.getElementById('violationDetailError').style.display = 'none';
-    
+
     // แสดงข้อมูล
     document.getElementById('violationDetailData').style.display = 'block';
     document.getElementById('deleteReportBtn').style.display = 'inline-block';
     document.getElementById('editReportBtn').style.display = 'inline-block';
-    
+
     // กำหนดสีของ badge ตามประเภท
     let badgeClass = 'bg-danger';
     switch (data.violation.category) {
@@ -737,7 +800,7 @@ function displayViolationDetail(data) {
             badgeClass = 'bg-danger';
             break;
     }
-    
+
     // แสดงข้อมูลนักเรียน
     document.getElementById('studentInfo').innerHTML = `
         <img src="${data.student.avatar_url}" class="rounded-circle me-3" width="50" height="50" alt="รูปประจำตัว">
@@ -746,9 +809,9 @@ function displayViolationDetail(data) {
             <p class="mb-0 text-muted">รหัสนักเรียน: ${data.student.student_code} | ชั้น ${data.student.class}</p>
         </div>
     `;
-    
+
     // แสดงรายละเอียดการกระทำผิด
-    const evidenceHtml = data.report.evidence_url 
+    const evidenceHtml = data.report.evidence_url
         ? `<div class="mb-3">
                <label class="text-muted d-block">รูปภาพหลักฐาน</label>
                <img src="${data.report.evidence_url}" class="img-fluid rounded" alt="รูปภาพหลักฐาน" style="max-height: 300px;">
@@ -757,7 +820,7 @@ function displayViolationDetail(data) {
                <label class="text-muted d-block">รูปภาพหลักฐาน</label>
                <p class="text-muted">ไม่มีรูปภาพหลักฐาน</p>
            </div>`;
-    
+
     document.getElementById('violationInfo').innerHTML = `
         <div class="mb-3">
             <label class="text-muted d-block">ประเภทการกระทำผิด</label>
@@ -781,13 +844,13 @@ function displayViolationDetail(data) {
         </div>
         ${evidenceHtml}
     `;
-    
+
     // ตั้งค่าปุ่มลบและแก้ไข
-    document.getElementById('deleteReportBtn').onclick = function() {
+    document.getElementById('deleteReportBtn').onclick = function () {
         deleteViolationReport(data.id);
     };
-    
-    document.getElementById('editReportBtn').onclick = function() {
+
+    document.getElementById('editReportBtn').onclick = function () {
         editViolationReport(data.id);
     };
 }
@@ -802,7 +865,7 @@ function deleteViolationReport(reportId) {
         const originalText = deleteBtn.innerHTML;
         deleteBtn.disabled = true;
         deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังลบ...';
-        
+
         fetch(`/api/behavior-reports/${reportId}/delete`, {
             method: 'POST',
             headers: {
@@ -811,64 +874,64 @@ function deleteViolationReport(reportId) {
                 'Content-Type': 'application/json'
             }
         })
-        .then(response => {
-            // ตรวจสอบสิทธิ์การเข้าถึง
-            if (response.status === 403) {
-                return response.json().then(data => {
-                    throw new Error(data.message || 'คุณไม่มีสิทธิ์ลบรายงานนี้');
-                });
-            }
-            if (!response.ok) {
-                throw new Error('เกิดข้อผิดพลาดในการลบรายงาน');
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                // แสดงข้อความสำเร็จด้วย SweetAlert ถ้ามี
+            .then(response => {
+                // ตรวจสอบสิทธิ์การเข้าถึง
+                if (response.status === 403) {
+                    return response.json().then(data => {
+                        throw new Error(data.message || 'คุณไม่มีสิทธิ์ลบรายงานนี้');
+                    });
+                }
+                if (!response.ok) {
+                    throw new Error('เกิดข้อผิดพลาดในการลบรายงาน');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // แสดงข้อความสำเร็จด้วย SweetAlert ถ้ามี
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'สำเร็จ',
+                            text: data.message || 'ลบรายงานพฤติกรรมเรียบร้อยแล้ว',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                    } else {
+                        showSuccess(data.message || 'ลบรายงานพฤติกรรมเรียบร้อยแล้ว');
+                    }
+
+                    // ปิด modal และรีเฟรชรายการ
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('violationDetailModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+
+                    // รีเฟรชรายการ
+                    loadRecentReports();
+                } else {
+                    throw new Error(data.message || 'เกิดข้อผิดพลาดในการลบรายงาน');
+                }
+            })
+            .catch(error => {
+                // แสดงข้อความ error ด้วย SweetAlert ถ้ามี
                 if (typeof Swal !== 'undefined') {
                     Swal.fire({
-                        icon: 'success',
-                        title: 'สำเร็จ',
-                        text: data.message || 'ลบรายงานพฤติกรรมเรียบร้อยแล้ว',
-                        timer: 2000,
-                        showConfirmButton: false
+                        icon: 'error',
+                        title: 'ไม่สามารถลบได้',
+                        text: error.message,
+                        confirmButtonText: 'ตกลง',
+                        confirmButtonColor: '#d33'
                     });
                 } else {
-                    showSuccess(data.message || 'ลบรายงานพฤติกรรมเรียบร้อยแล้ว');
+                    showError(error.message);
                 }
-                
-                // ปิด modal และรีเฟรชรายการ
-                const modal = bootstrap.Modal.getInstance(document.getElementById('violationDetailModal'));
-                if (modal) {
-                    modal.hide();
-                }
-                
-                // รีเฟรชรายการ
-                loadRecentReports();
-            } else {
-                throw new Error(data.message || 'เกิดข้อผิดพลาดในการลบรายงาน');
-            }
-        })
-        .catch(error => {
-            // แสดงข้อความ error ด้วย SweetAlert ถ้ามี
-            if (typeof Swal !== 'undefined') {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'ไม่สามารถลบได้',
-                    text: error.message,
-                    confirmButtonText: 'ตกลง',
-                    confirmButtonColor: '#d33'
-                });
-            } else {
-                showError(error.message);
-            }
-        })
-        .finally(() => {
-            // คืนสถานะปุ่ม
-            deleteBtn.disabled = false;
-            deleteBtn.innerHTML = originalText;
-        });
+            })
+            .finally(() => {
+                // คืนสถานะปุ่ม
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = originalText;
+            });
     }
 }
 
@@ -881,7 +944,7 @@ function editViolationReport(reportId) {
     if (detailModal) {
         detailModal.hide();
     }
-    
+
     // เปิด sidebar และโหลดข้อมูล
     openEditViolationSidebar(reportId);
 }
@@ -897,9 +960,9 @@ function loadStudentDetails(studentId) {
 
     // ตั้งค่า data-student-id ให้กับ modal (เพิ่มบรรทัดนี้)
     document.getElementById('studentDetailModal').setAttribute('data-student-id', studentId);
-    
+
     showStudentDetailLoading();
-    
+
     fetch(`/api/students/${studentId}`, {
         method: 'GET',
         headers: {
@@ -910,40 +973,40 @@ function loadStudentDetails(studentId) {
         },
         credentials: 'same-origin'
     })
-    .then(response => {
-        if (!response.ok) {
-            if (response.status === 404) {
-                throw new Error('ไม่พบข้อมูลนักเรียนที่ระบุ');
-            } else if (response.status === 403) {
-                throw new Error('คุณไม่มีสิทธิ์เข้าถึงข้อมูลนี้');
-            } else if (response.status === 500) {
-                throw new Error('เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์');
-            } else {
-                throw new Error(`เกิดข้อผิดพลาด (HTTP ${response.status})`);
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error('ไม่พบข้อมูลนักเรียนที่ระบุ');
+                } else if (response.status === 403) {
+                    throw new Error('คุณไม่มีสิทธิ์เข้าถึงข้อมูลนี้');
+                } else if (response.status === 500) {
+                    throw new Error('เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์');
+                } else {
+                    throw new Error(`เกิดข้อผิดพลาด (HTTP ${response.status})`);
+                }
             }
-        }
-        
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            throw new Error('เซิร์ฟเวอร์ส่งข้อมูลกลับมาในรูปแบบที่ไม่ถูกต้อง');
-        }
-        
-        return response.json();
-    })
-    .then(data => {
-        if (!data.success) {
-            throw new Error(data.message || 'ไม่สามารถดึงข้อมูลนักเรียนได้');
-        }
-        
-        if (!data.student) {
-            throw new Error('ข้อมูลนักเรียนไม่สมบูรณ์');
-        }
-        
-        populateStudentDetailModal(data.student);
-    })
-    .catch(error => {
-        showStudentDetailError(error.message);
-    });
+
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('เซิร์ฟเวอร์ส่งข้อมูลกลับมาในรูปแบบที่ไม่ถูกต้อง');
+            }
+
+            return response.json();
+        })
+        .then(data => {
+            if (!data.success) {
+                throw new Error(data.message || 'ไม่สามารถดึงข้อมูลนักเรียนได้');
+            }
+
+            if (!data.student) {
+                throw new Error('ข้อมูลนักเรียนไม่สมบูรณ์');
+            }
+
+            populateStudentDetailModal(data.student);
+        })
+        .catch(error => {
+            showStudentDetailError(error.message);
+        });
 }
 
 /**
@@ -952,7 +1015,7 @@ function loadStudentDetails(studentId) {
 function showStudentDetailLoading() {
     const modal = document.getElementById('studentDetailModal');
     const modalBody = modal.querySelector('.modal-body');
-    
+
     modalBody.innerHTML = `
         <div class="text-center py-5" id="student-detail-loading">
             <div class="spinner-border text-primary" role="status">
@@ -969,7 +1032,7 @@ function showStudentDetailLoading() {
 function showStudentDetailError(message) {
     const modal = document.getElementById('studentDetailModal');
     const modalBody = modal.querySelector('.modal-body');
-    
+
     modalBody.innerHTML = `
         <div class="text-center py-5 text-danger">
             <i class="fas fa-exclamation-circle fa-3x mb-3"></i>
@@ -986,35 +1049,35 @@ function showStudentDetailError(message) {
 function populateStudentDetailModal(student) {
     const modal = document.getElementById('studentDetailModal');
     const modalBody = modal.querySelector('.modal-body');
-    
+
     const fullName = `${student.user.users_name_prefix}${student.user.users_first_name} ${student.user.users_last_name}`;
-    
-    const avatarUrl = student.user.users_profile_image 
-        ? `/storage/${student.user.users_profile_image}` 
+
+    const avatarUrl = student.user.users_profile_image
+        ? `/storage/${student.user.users_profile_image}`
         : `https://ui-avatars.com/api/?name=${encodeURIComponent(student.user.users_first_name)}&background=95A4D8&color=fff`;
-    
-    const classroomText = student.classroom 
+
+    const classroomText = student.classroom
         ? `${student.classroom.classes_level}/${student.classroom.classes_room_number}`
         : 'ไม่มีห้องเรียน';
-    
+
     const guardianName = student.guardian && student.guardian.user
         ? `${student.guardian.user.users_name_prefix}${student.guardian.user.users_first_name} ${student.guardian.user.users_last_name}`
         : 'ไม่มีข้อมูล';
-    
+
     const guardianPhone = student.guardian?.guardians_phone || '-';
-    
-    const birthDate = student.user.users_birthdate 
+
+    const birthDate = student.user.users_birthdate
         ? new Date(student.user.users_birthdate).toLocaleDateString('th-TH', {
             year: 'numeric',
             month: 'long',
             day: 'numeric'
-          })
+        })
         : '-';
-    
+
     const score = student.students_current_score || 100;
     let progressClass = 'bg-success';
     let emojiSrc = 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple@7.0.2/img/apple/64/1f60a.png'; // 😊
-    
+
     if (score <= 50) {
         progressClass = 'bg-danger';
         emojiSrc = 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple@7.0.2/img/apple/64/1f622.png'; // 😢
@@ -1022,7 +1085,7 @@ function populateStudentDetailModal(student) {
         progressClass = 'bg-warning';
         emojiSrc = 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple@7.0.2/img/apple/64/1f610.png'; // 😐
     }
-    
+
     // สร้างตารางประวัติการกระทำผิด
     let violationsTableRows = '';
     if (student.behavior_reports && student.behavior_reports.length > 0) {
@@ -1033,13 +1096,13 @@ function populateStudentDetailModal(student) {
             } else if (report.violation.violations_category === 'medium') {
                 badgeClass = 'bg-warning text-dark';
             }
-            
+
             const reportDate = new Date(report.reports_report_date).toLocaleDateString('th-TH', {
                 day: '2-digit',
                 month: '2-digit',
                 year: 'numeric'
             });
-            
+
             return `
                 <tr>
                     <td>${reportDate}</td>
@@ -1056,7 +1119,7 @@ function populateStudentDetailModal(student) {
             </tr>
         `;
     }
-    
+
     modalBody.innerHTML = `
         <div class="row">
             <div class="col-md-4 mb-3 mb-md-0">
@@ -1073,14 +1136,14 @@ function populateStudentDetailModal(student) {
                         <button class="btn btn-warning" onclick="slideToPasswordReset(${student.students_id}, '${fullName}')" id="resetPasswordBtn-${student.students_id}">
                             <i class="fas fa-key me-1"></i> รีเซ็ตรหัสผ่าน
                         </button>
-                        ${guardianPhone !== '-' ? 
-                            `<button class="btn ${score < 40 ? 'btn-danger' : 'btn-outline-warning'}" id="notifyParentBtn"
+                        ${guardianPhone !== '-' ?
+            `<button class="btn ${score < 40 ? 'btn-danger' : 'btn-outline-warning'}" id="notifyParentBtn"
                                     onclick="openParentNotificationModal(${student.students_id}, '${fullName}', '${classroomText}', ${score}, '${guardianPhone}')">
                                 <i class="fas fa-bell me-1"></i> แจ้งเตือนผู้ปกครอง
                                 ${score < 40 ? '<span class="badge bg-white text-danger ms-1">!</span>' : ''}
-                            </button>` 
-                            : ''
-                        }
+                            </button>`
+            : ''
+        }
                     </div>
                 </div>
             </div>
@@ -1159,13 +1222,13 @@ function openBehaviorRecordModal(studentId, studentName, classroom) {
     if (studentDetailModal) {
         studentDetailModal.hide();
     }
-    
+
     setTimeout(() => {
         const violationModal = new bootstrap.Modal(document.getElementById('newViolationModal'));
-        
+
         document.getElementById('selectedStudentId').value = studentId;
         document.getElementById('behaviorStudentSearch').value = studentName;
-        
+
         const selectedStudentInfo = document.getElementById('selectedStudentInfo');
         const studentInfoDisplay = document.getElementById('studentInfoDisplay');
         studentInfoDisplay.innerHTML = `
@@ -1173,7 +1236,7 @@ function openBehaviorRecordModal(studentId, studentName, classroom) {
             ชั้น ${classroom}
         `;
         selectedStudentInfo.style.display = 'block';
-        
+
         violationModal.show();
     }, 500);
 }
@@ -1215,15 +1278,15 @@ function showToast(type, message) {
         toastContainer.style.zIndex = '9999';
         document.body.appendChild(toastContainer);
     }
-    
+
     const toastId = 'toast-' + Date.now();
     const bgClass = type === 'success' ? 'bg-success' : 'bg-danger';
     const icon = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
     const title = type === 'success' ? 'สำเร็จ' : 'ข้อผิดพลาด';
-    
+
     // แปลง \n เป็น <br> สำหรับการแสดงผล
     const formattedMessage = message.replace(/\n/g, '<br>');
-    
+
     const toastHtml = `
         <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="toast-header ${bgClass} text-white">
@@ -1236,19 +1299,19 @@ function showToast(type, message) {
             </div>
         </div>
     `;
-    
+
     toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-    
+
     const toastElement = document.getElementById(toastId);
     const toast = new bootstrap.Toast(toastElement, {
         autohide: true,
         delay: type === 'success' ? 3000 : 5000
     });
-    
+
     toast.show();
-    
+
     // ลบ Toast เมื่อซ่อน
-    toastElement.addEventListener('hidden.bs.toast', function() {
+    toastElement.addEventListener('hidden.bs.toast', function () {
         this.remove();
     });
 }
@@ -1270,7 +1333,7 @@ function printStudentReport(event) {
         alert('ไม่พบรหัสนักเรียน กรุณาลองใหม่อีกครั้ง');
         return;
     }
-    
+
     // แสดง loading
     const originalText = button.innerHTML;
     button.disabled = true;
@@ -1287,77 +1350,77 @@ function printStudentReport(event) {
         },
         credentials: 'include' // เพิ่มบรรทัดนี้เพื่อให้ browser ส่ง cookies ไปกับ request
     })
-    .then(async response => { // เพิ่ม async เพื่อให้ใช้ await ภายในได้
-        if (!response.ok) {
-            let errorMessage = `เกิดข้อผิดพลาด (${response.status})`;
+        .then(async response => { // เพิ่ม async เพื่อให้ใช้ await ภายในได้
+            if (!response.ok) {
+                let errorMessage = `เกิดข้อผิดพลาด (${response.status})`;
 
-            // พยายามอ่าน error message จาก JSON response ถ้ามี
-            if (response.headers.get('content-type')?.includes('application/json')) {
-                try {
-                    const errorData = await response.json();
-                    if (errorData && errorData.message) {
-                        errorMessage = errorData.message;
+                // พยายามอ่าน error message จาก JSON response ถ้ามี
+                if (response.headers.get('content-type')?.includes('application/json')) {
+                    try {
+                        const errorData = await response.json();
+                        if (errorData && errorData.message) {
+                            errorMessage = errorData.message;
+                        }
+                    } catch (e) {
                     }
-                } catch (e) {
+                } else {
+                    // ถ้าไม่ใช่ JSON อาจอ่านเป็น text
+                    try {
+                        const errorText = await response.text();
+                        console.error('Server error text:', errorText);
+                        // อาจจะแสดง errorText บางส่วนถ้ามีประโยชน์
+                    } catch (e) {
+                        console.error('Could not read text error response:', e);
+                    }
                 }
-            } else {
-                // ถ้าไม่ใช่ JSON อาจอ่านเป็น text
-                try {
-                    const errorText = await response.text();
-                    console.error('Server error text:', errorText);
-                    // อาจจะแสดง errorText บางส่วนถ้ามีประโยชน์
-                } catch (e) {
-                     console.error('Could not read text error response:', e);
+                // ตรวจสอบสถานะเพื่อแสดงข้อความที่เหมาะสม
+                if (response.status === 401) { // Unauthorized
+                    errorMessage = 'คุณไม่มีสิทธิ์เข้าถึง กรุณาเข้าสู่ระบบใหม่อีกครั้ง (401)';
+                } else if (response.status === 403) { // Forbidden
+                    errorMessage = 'คุณไม่มีสิทธิ์ในการดำเนินการนี้ (403)';
+                } else if (response.status === 404) { // Not Found
+                    errorMessage = 'ไม่พบข้อมูลหรือ Endpoint ที่ร้องขอ (404)';
                 }
+                throw new Error(errorMessage); // โยน Error พร้อม message ที่ได้
             }
-            // ตรวจสอบสถานะเพื่อแสดงข้อความที่เหมาะสม
-            if (response.status === 401) { // Unauthorized
-                errorMessage = 'คุณไม่มีสิทธิ์เข้าถึง กรุณาเข้าสู่ระบบใหม่อีกครั้ง (401)';
-            } else if (response.status === 403) { // Forbidden
-                errorMessage = 'คุณไม่มีสิทธิ์ในการดำเนินการนี้ (403)';
-            } else if (response.status === 404) { // Not Found
-                errorMessage = 'ไม่พบข้อมูลหรือ Endpoint ที่ร้องขอ (404)';
-            }
-            throw new Error(errorMessage); // โยน Error พร้อม message ที่ได้
-        }
-        
-        return response.blob();
-    })
-    .then(blob => {
-        if (blob.type !== 'application/pdf') {
-            console.warn('Received blob is not PDF. Type:', blob.type);
-            throw new Error('Server ไม่ได้ส่งไฟล์ PDF กลับมาอย่างถูกต้อง');
-        }
 
-        // สร้าง URL สำหรับดาวน์โหลด
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = `รายงานนักเรียน-${studentId}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-    })
-    .catch(error => { // แก้ไขการจัดการ error ให้แสดง message ที่ชัดเจนขึ้น
-        console.error('Error generating report:', error);
-        alert(`ไม่สามารถสร้างรายงานได้: ${error.message}`);
-    })
-    .finally(() => {
-        // คืนค่าปุ่ม
-        button.disabled = false;
-        button.innerHTML = originalText;
-    });
+            return response.blob();
+        })
+        .then(blob => {
+            if (blob.type !== 'application/pdf') {
+                console.warn('Received blob is not PDF. Type:', blob.type);
+                throw new Error('Server ไม่ได้ส่งไฟล์ PDF กลับมาอย่างถูกต้อง');
+            }
+
+            // สร้าง URL สำหรับดาวน์โหลด
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `รายงานนักเรียน-${studentId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        })
+        .catch(error => { // แก้ไขการจัดการ error ให้แสดง message ที่ชัดเจนขึ้น
+            console.error('Error generating report:', error);
+            alert(`ไม่สามารถสร้างรายงานได้: ${error.message}`);
+        })
+        .finally(() => {
+            // คืนค่าปุ่ม
+            button.disabled = false;
+            button.innerHTML = originalText;
+        });
 }
 
 // Event Listeners สำหรับ Student Detail Modal
-document.addEventListener('DOMContentLoaded', function() {
-    document.addEventListener('click', function(e) {
+document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('click', function (e) {
         if (e.target.closest('[data-bs-target="#studentDetailModal"]')) {
             const button = e.target.closest('[data-bs-target="#studentDetailModal"]');
             const studentId = button.getAttribute('data-student-id');
-            
+
             if (studentId) {
                 setTimeout(() => {
                     loadStudentDetails(studentId);
@@ -1365,26 +1428,26 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
-    
+
     const studentDetailModal = document.getElementById('studentDetailModal');
     if (studentDetailModal) {
-        studentDetailModal.addEventListener('show.bs.modal', function(event) {
+        studentDetailModal.addEventListener('show.bs.modal', function (event) {
             const button = event.relatedTarget;
-            
+
             if (button && button.hasAttribute('data-student-id')) {
                 const studentId = button.getAttribute('data-student-id');
-                
+
                 setTimeout(() => {
                     loadStudentDetails(studentId);
                 }, 150);
             }
         });
-        
-        studentDetailModal.addEventListener('shown.bs.modal', function() {
+
+        studentDetailModal.addEventListener('shown.bs.modal', function () {
             this.removeAttribute('aria-hidden');
         });
-        
-        studentDetailModal.addEventListener('hidden.bs.modal', function() {
+
+        studentDetailModal.addEventListener('hidden.bs.modal', function () {
             this.setAttribute('aria-hidden', 'true');
         });
     }
@@ -1403,20 +1466,20 @@ function checkTeacherPermission(studentId) {
         },
         credentials: 'same-origin'
     })
-    .then(response => response.json())
-    .then(data => {
-        // หากไม่มีสิทธิ์ แสดง error message
-        if (!data.hasPermission) {
-            showError(data.message || 'คุณไม่มีสิทธิ์รีเซ็ตรหัสผ่านของนักเรียนคนนี้');
+        .then(response => response.json())
+        .then(data => {
+            // หากไม่มีสิทธิ์ แสดง error message
+            if (!data.hasPermission) {
+                showError(data.message || 'คุณไม่มีสิทธิ์รีเซ็ตรหัสผ่านของนักเรียนคนนี้');
+                return false;
+            }
+
+            return data.success && data.hasPermission;
+        })
+        .catch(error => {
+            console.error('Error checking teacher permission:', error);
             return false;
-        }
-        
-        return data.success && data.hasPermission;
-    })
-    .catch(error => {
-        console.error('Error checking teacher permission:', error);
-        return false;
-    });
+        });
 }
 
 /**
@@ -1429,14 +1492,14 @@ function slideToPasswordReset(studentId, studentName) {
             if (!hasPermission) {
                 return; // checkTeacherPermission จะจัดการ error message เอง
             }
-            
+
             // ตรวจสอบว่ามี Modal อยู่แล้วหรือไม่
             const existingModal = document.getElementById('studentDetailModal');
             if (!existingModal) {
                 showError('ไม่พบ Modal นักเรียน กรุณาเปิด Modal ใหม่');
                 return;
             }
-            
+
             // แปลง Modal ให้รองรับระบบ slide
             transformModalToSlideSystem(existingModal, studentId, studentName);
         })
@@ -1453,11 +1516,11 @@ function transformModalToSlideSystem(modal, studentId, studentName) {
     const modalContent = modal.querySelector('.modal-content');
     const currentBody = modal.querySelector('.modal-body');
     const currentHeader = modal.querySelector('.modal-header');
-    
+
     // เก็บข้อมูลเดิมไว้
     const originalBodyContent = currentBody.innerHTML;
     const originalHeaderContent = currentHeader.innerHTML;
-    
+
     // สร้างโครงสร้างใหม่สำหรับ slide system
     const slideHtml = `
         <div class="modal-slide-container">
@@ -1534,13 +1597,13 @@ function transformModalToSlideSystem(modal, studentId, studentName) {
             </div>
         </div>
     `;
-    
+
     // แทนที่เนื้อหา Modal
     modalContent.innerHTML = slideHtml;
-    
+
     // เพิ่ม event listeners สำหรับ password validation
     setupPasswordValidation();
-    
+
     // Slide ไปหน้า password reset
     setTimeout(() => {
         slideToPasswordScreen();
@@ -1578,14 +1641,14 @@ function setupPasswordValidation() {
     const strengthIndicator = document.getElementById('passwordStrength');
     const matchError = document.getElementById('passwordMatchError');
     const confirmBtn = document.getElementById('confirmResetBtn');
-    
+
     if (!passwordInput || !confirmInput) return;
-    
+
     // ตรวจสอบความแข็งแรงของรหัสผ่าน
-    passwordInput.addEventListener('input', function() {
+    passwordInput.addEventListener('input', function () {
         const password = this.value;
         const strength = calculatePasswordStrength(password);
-        
+
         if (password.length === 0) {
             strengthIndicator.style.width = '0%';
             strengthIndicator.className = 'password-strength-indicator';
@@ -1599,17 +1662,17 @@ function setupPasswordValidation() {
             strengthIndicator.style.width = '100%';
             strengthIndicator.className = 'password-strength-indicator password-strength-strong';
         }
-        
+
         validatePasswordMatch();
     });
-    
+
     // ตรวจสอบรหัสผ่านตรงกันหรือไม่
     confirmInput.addEventListener('input', validatePasswordMatch);
-    
+
     function validatePasswordMatch() {
         const password = passwordInput.value;
         const confirm = confirmInput.value;
-        
+
         if (confirm.length > 0 && password !== confirm) {
             matchError.style.display = 'block';
             confirmInput.style.borderColor = '#dc3545';
@@ -1627,23 +1690,23 @@ function setupPasswordValidation() {
  */
 function calculatePasswordStrength(password) {
     let strength = 0;
-    
+
     // ความยาว
     if (password.length >= 8) strength += 25;
     if (password.length >= 12) strength += 25;
-    
+
     // มีตัวเลข
     if (/\d/.test(password)) strength += 15;
-    
+
     // มีตัวอักษรพิมพ์เล็ก
     if (/[a-z]/.test(password)) strength += 15;
-    
+
     // มีตัวอักษรพิมพ์ใหญ่
     if (/[A-Z]/.test(password)) strength += 10;
-    
+
     // มีอักขระพิเศษ
     if (/[^A-Za-z0-9]/.test(password)) strength += 10;
-    
+
     return Math.min(strength, 100);
 }
 
@@ -1653,7 +1716,7 @@ function calculatePasswordStrength(password) {
 function togglePasswordVisibility(inputId) {
     const input = document.getElementById(inputId);
     const icon = input.nextElementSibling.querySelector('i');
-    
+
     if (input.type === 'password') {
         input.type = 'text';
         icon.classList.remove('fa-eye');
@@ -1672,24 +1735,24 @@ function resetStudentPassword(studentId) {
     const password = document.getElementById('new_password').value;
     const confirmation = document.getElementById('new_password_confirmation').value;
     const btn = document.getElementById('confirmResetBtn');
-    
+
     // ตรวจสอบรหัสผ่าน
     if (password !== confirmation) {
         showError('รหัสผ่านใหม่และการยืนยันไม่ตรงกัน');
         return;
     }
-    
+
     if (password.length < 8) {
         showError('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');
         return;
     }
-    
+
     // แสดง loading state
     btn.disabled = true;
     btn.classList.add('btn-loading');
     const originalText = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>กำลังรีเซ็ตรหัสผ่าน...';
-    
+
     // ส่งข้อมูลไปยัง API
     fetch(`/api/teacher/student/${studentId}/reset-password`, {
         method: 'POST',
@@ -1705,46 +1768,46 @@ function resetStudentPassword(studentId) {
             new_password_confirmation: confirmation
         })
     })
-    .then(async response => {
-        const data = await response.json().catch(() => ({}));
-        // ถ้า validation ไม่ผ่าน ให้แสดงรายละเอียดจากเซิร์ฟเวอร์
-        if (!response.ok) {
-            if (response.status === 422 && data && data.errors) {
-                const messages = Object.values(data.errors).flat().join('\n');
-                throw new Error(messages || data.message || 'ข้อมูลไม่ถูกต้อง');
-            }
-            throw new Error(data.message || `เกิดข้อผิดพลาด (HTTP ${response.status})`);
-        }
-        return data;
-    })
-    .then(data => {
-        if (data.success) {
-            showSuccess(data.message || 'รีเซ็ตรหัสผ่านสำเร็จแล้ว');
-            
-            // รอ 2 วินาที แล้วปิด Modal
-            setTimeout(() => {
-                const modal = document.getElementById('studentDetailModal');
-                if (modal) {
-                    const bsModal = bootstrap.Modal.getInstance(modal);
-                    if (bsModal) {
-                        bsModal.hide();
-                    }
+        .then(async response => {
+            const data = await response.json().catch(() => ({}));
+            // ถ้า validation ไม่ผ่าน ให้แสดงรายละเอียดจากเซิร์ฟเวอร์
+            if (!response.ok) {
+                if (response.status === 422 && data && data.errors) {
+                    const messages = Object.values(data.errors).flat().join('\n');
+                    throw new Error(messages || data.message || 'ข้อมูลไม่ถูกต้อง');
                 }
-            }, 2000);
-        } else {
-            showError(data.message || 'เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน');
-        }
-    })
-    .catch(error => {
-        console.error('Error resetting password:', error);
-        showError('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง');
-    })
-    .finally(() => {
-        // คืนสถานะปุ่ม
-        btn.disabled = false;
-        btn.classList.remove('btn-loading');
-        btn.innerHTML = originalText;
-    });
+                throw new Error(data.message || `เกิดข้อผิดพลาด (HTTP ${response.status})`);
+            }
+            return data;
+        })
+        .then(data => {
+            if (data.success) {
+                showSuccess(data.message || 'รีเซ็ตรหัสผ่านสำเร็จแล้ว');
+
+                // รอ 2 วินาที แล้วปิด Modal
+                setTimeout(() => {
+                    const modal = document.getElementById('studentDetailModal');
+                    if (modal) {
+                        const bsModal = bootstrap.Modal.getInstance(modal);
+                        if (bsModal) {
+                            bsModal.hide();
+                        }
+                    }
+                }, 2000);
+            } else {
+                showError(data.message || 'เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน');
+            }
+        })
+        .catch(error => {
+            console.error('Error resetting password:', error);
+            showError('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง');
+        })
+        .finally(() => {
+            // คืนสถานะปุ่ม
+            btn.disabled = false;
+            btn.classList.remove('btn-loading');
+            btn.innerHTML = originalText;
+        });
 }
 
 /**
@@ -1753,18 +1816,18 @@ function resetStudentPassword(studentId) {
 function openEditViolationSidebar(reportId) {
     const sidebar = document.getElementById('editViolationSidebar');
     sidebar.classList.add('show');
-    
+
     // รีเซ็ตสถานะ
     showEditViolationLoading();
     hideEditViolationError();
     hideEditViolationForm();
     hideEditViolationActions();
-    
+
     // โหลดข้อมูลรายงาน
     loadViolationReportForEdit(reportId);
-    
+
     // เพิ่ม event listener สำหรับปิด sidebar เมื่อคลิกพื้นหลัง
-    sidebar.addEventListener('click', function(e) {
+    sidebar.addEventListener('click', function (e) {
         if (e.target === sidebar) {
             closeEditViolationSidebar();
         }
@@ -1777,7 +1840,7 @@ function openEditViolationSidebar(reportId) {
 function closeEditViolationSidebar() {
     const sidebar = document.getElementById('editViolationSidebar');
     sidebar.classList.remove('show');
-    
+
     // รีเซ็ตฟอร์ม
     const form = document.getElementById('violationEditForm');
     if (form) {
@@ -1871,7 +1934,7 @@ function loadViolationReportForEdit(reportId) {
  */
 function populateEditForm(data) {
     hideEditViolationLoading();
-    
+
     // เติมข้อมูลพื้นฐาน
     document.getElementById('editReportId').value = data.id;
 
@@ -1884,7 +1947,7 @@ function populateEditForm(data) {
         originalTime: null,
         originalDescription: ''
     };
-    
+
     // ข้อมูลนักเรียน
     const studentInfo = `
         <div class="d-flex align-items-center">
@@ -1896,11 +1959,11 @@ function populateEditForm(data) {
         </div>
     `;
     document.getElementById('editStudentInfoDisplay').innerHTML = studentInfo;
-    
+
     // โหลดประเภทพฤติกรรมและเลือกค่าปัจจุบัน - ต้องใช้ violation id ที่ถูกต้อง
     // ก่อนอื่นต้องหา violation id จากข้อมูลเดิม
     findViolationIdAndLoadTypes(data);
-    
+
     // เติมข้อมูลวันที่และเวลา
     if (data.report && data.report.report_datetime) {
         try {
@@ -1923,11 +1986,11 @@ function populateEditForm(data) {
             window.behaviorEditContext.originalTime = document.getElementById('editViolationTime').value;
         }
     }
-    
+
     // เติมรายละเอียด
     document.getElementById('editViolationDescription').value = data.report?.description || '';
     window.behaviorEditContext.originalDescription = document.getElementById('editViolationDescription').value || '';
-    
+
     // หลักฐาน
     if (data.report?.evidence_url) {
         document.getElementById('currentEvidenceImage').src = data.report.evidence_url;
@@ -1935,19 +1998,19 @@ function populateEditForm(data) {
     } else {
         document.getElementById('currentEvidenceSection').style.display = 'none';
     }
-    
+
     showEditViolationForm();
     showEditViolationActions();
-    
+
     // เพิ่ม event listener สำหรับปุ่มบันทึก
-    document.getElementById('saveEditViolationBtn').onclick = function() {
+    document.getElementById('saveEditViolationBtn').onclick = function () {
         saveViolationEdit();
     };
 
     // ปุ่มลบจากใน Sidebar แก้ไข
     const deleteBtn = document.getElementById('deleteEditViolationBtn');
     if (deleteBtn) {
-        deleteBtn.onclick = function() {
+        deleteBtn.onclick = function () {
             const reportId = document.getElementById('editReportId').value;
             if (!reportId) return;
 
@@ -1988,39 +2051,39 @@ function populateEditForm(data) {
                             'Content-Type': 'application/json'
                         }
                     })
-                    .then(r => {
-                        if (!r.ok) throw new Error('ลบไม่สำเร็จ');
-                        return r.json();
-                    })
-                    .then(resp => {
-                        if (resp.success === false) throw new Error(resp.message || 'ลบไม่สำเร็จ');
+                        .then(r => {
+                            if (!r.ok) throw new Error('ลบไม่สำเร็จ');
+                            return r.json();
+                        })
+                        .then(resp => {
+                            if (resp.success === false) throw new Error(resp.message || 'ลบไม่สำเร็จ');
 
-                        // Toast แจ้งลบสำเร็จ
-                        if (typeof Swal !== 'undefined') {
-                            Swal.fire({
-                                toast: true,
-                                position: 'top-end',
-                                icon: 'success',
-                                title: resp.message || 'ลบรายงานสำเร็จ',
-                                showConfirmButton: false,
-                                timer: 2000,
-                                timerProgressBar: true
-                            });
-                        }
+                            // Toast แจ้งลบสำเร็จ
+                            if (typeof Swal !== 'undefined') {
+                                Swal.fire({
+                                    toast: true,
+                                    position: 'top-end',
+                                    icon: 'success',
+                                    title: resp.message || 'ลบรายงานสำเร็จ',
+                                    showConfirmButton: false,
+                                    timer: 2000,
+                                    timerProgressBar: true
+                                });
+                            }
 
-                        // รีเฟรชตารางและปิด Sidebar
-                        loadRecentReports();
-                        closeEditViolationSidebar();
-                    })
-                    .catch(err => {
-                        if (typeof Swal !== 'undefined') {
-                            Swal.fire({ icon: 'error', title: 'ลบไม่สำเร็จ', text: err.message || 'เกิดข้อผิดพลาด' });
-                        }
-                    })
-                    .finally(() => {
-                        deleteBtn.disabled = false;
-                        deleteBtn.innerHTML = original;
-                    });
+                            // รีเฟรชตารางและปิด Sidebar
+                            loadRecentReports();
+                            closeEditViolationSidebar();
+                        })
+                        .catch(err => {
+                            if (typeof Swal !== 'undefined') {
+                                Swal.fire({ icon: 'error', title: 'ลบไม่สำเร็จ', text: err.message || 'เกิดข้อผิดพลาด' });
+                            }
+                        })
+                        .finally(() => {
+                            deleteBtn.disabled = false;
+                            deleteBtn.innerHTML = original;
+                        });
                 });
             }
         };
@@ -2037,22 +2100,22 @@ function findViolationIdAndLoadTypes(data) {
             if (violationsData.success) {
                 const select = document.getElementById('editViolationType');
                 select.innerHTML = '<option value="">เลือกประเภทพฤติกรรม</option>';
-                
+
                 let selectedViolationId = null;
-                
+
                 violationsData.data.forEach(violation => {
                     const option = document.createElement('option');
                     option.value = violation.violations_id;
                     option.textContent = violation.violations_name;
                     option.dataset.points = violation.violations_points_deducted;
-                    
+
                     // ค้นหา violation ที่ตรงกับชื่อในข้อมูล
                     if (violation.violations_name === data.violation?.name) {
                         option.selected = true;
                         selectedViolationId = violation.violations_id;
                         document.getElementById('editPointsDeducted').textContent = violation.violations_points_deducted;
                     }
-                    
+
                     select.appendChild(option);
                 });
 
@@ -2060,9 +2123,9 @@ function findViolationIdAndLoadTypes(data) {
                 if (window.behaviorEditContext) {
                     window.behaviorEditContext.originalViolationId = selectedViolationId;
                 }
-                
+
                 // เพิ่ม event listener สำหรับการเปลี่ยนประเภทพฤติกรรม
-                select.addEventListener('change', function() {
+                select.addEventListener('change', function () {
                     const selectedOption = this.options[this.selectedIndex];
                     const points = selectedOption.dataset.points || 0;
                     document.getElementById('editPointsDeducted').textContent = points;
@@ -2084,23 +2147,23 @@ function loadViolationTypesForEdit(selectedViolationId) {
             if (data.success) {
                 const select = document.getElementById('editViolationType');
                 select.innerHTML = '<option value="">เลือกประเภทพฤติกรรม</option>';
-                
+
                 data.data.forEach(violation => {
                     const option = document.createElement('option');
                     option.value = violation.violations_id;
                     option.textContent = violation.violations_name;
                     option.dataset.points = violation.violations_points_deducted;
-                    
+
                     if (violation.violations_id == selectedViolationId) {
                         option.selected = true;
                         document.getElementById('editPointsDeducted').textContent = violation.violations_points_deducted;
                     }
-                    
+
                     select.appendChild(option);
                 });
-                
+
                 // เพิ่ม event listener สำหรับการเปลี่ยนประเภทพฤติกรรม
-                select.addEventListener('change', function() {
+                select.addEventListener('change', function () {
                     const selectedOption = this.options[this.selectedIndex];
                     const points = selectedOption.dataset.points || 0;
                     document.getElementById('editPointsDeducted').textContent = points;
@@ -2119,17 +2182,17 @@ function saveViolationEdit() {
     const form = document.getElementById('violationEditForm');
     const formData = new FormData(form);
     const reportId = document.getElementById('editReportId').value;
-    
+
     // ซ่อนข้อความก่อนหน้า
     document.getElementById('editViolationSuccess').style.display = 'none';
     document.getElementById('editViolationFormError').style.display = 'none';
-    
+
     // ปุ่มบันทึก loading
     const saveBtn = document.getElementById('saveEditViolationBtn');
     const originalText = saveBtn.innerHTML;
     saveBtn.disabled = true;
     saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> กำลังบันทึก...';
-    
+
     // รวมวันที่และเวลา
     const date = document.getElementById('editViolationDate').value;
     const time = document.getElementById('editViolationTime').value;
@@ -2231,54 +2294,54 @@ function saveViolationEdit() {
                 },
                 body: formData
             })
-            .then(response => {
-                // ตรวจสอบสิทธิ์การเข้าถึง
-                if (response.status === 403) {
-                    return response.json().then(data => {
-                        throw new Error(data.message || 'คุณไม่มีสิทธิ์แก้ไขรายงานนี้');
-                    });
-                }
-                if (!response.ok) {
-                    throw new Error('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    // แสดงข้อความสำเร็จ
-                    document.getElementById('editViolationSuccessMessage').textContent = data.message || 'บันทึกการแก้ไขเรียบร้อยแล้ว';
-                    document.getElementById('editViolationSuccess').style.display = 'block';
+                .then(response => {
+                    // ตรวจสอบสิทธิ์การเข้าถึง
+                    if (response.status === 403) {
+                        return response.json().then(data => {
+                            throw new Error(data.message || 'คุณไม่มีสิทธิ์แก้ไขรายงานนี้');
+                        });
+                    }
+                    if (!response.ok) {
+                        throw new Error('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        // แสดงข้อความสำเร็จ
+                        document.getElementById('editViolationSuccessMessage').textContent = data.message || 'บันทึกการแก้ไขเรียบร้อยแล้ว';
+                        document.getElementById('editViolationSuccess').style.display = 'block';
 
-                    // รีเฟรชข้อมูลในตาราง
-                    loadRecentReports();
+                        // รีเฟรชข้อมูลในตาราง
+                        loadRecentReports();
 
-                    // ปิด sidebar หลัง 2 วินาที
-                    setTimeout(() => {
-                        closeEditViolationSidebar();
-                    }, 2000);
-                } else {
-                    throw new Error(data.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-                }
-            })
-            .catch(error => {
-                // แสดงข้อความ error ในรูปแบบ alert ที่เด่นชัด
-                if (typeof Swal !== 'undefined') {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'ไม่สามารถแก้ไขได้',
-                        text: error.message,
-                        confirmButtonText: 'ตกลง',
-                        confirmButtonColor: '#d33'
-                    });
-                }
-                document.getElementById('editViolationFormErrorMessage').textContent = error.message;
-                document.getElementById('editViolationFormError').style.display = 'block';
-            })
-            .finally(() => {
-                // คืนสถานะปุ่ม
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = originalText;
-            });
+                        // ปิด sidebar หลัง 2 วินาที
+                        setTimeout(() => {
+                            closeEditViolationSidebar();
+                        }, 2000);
+                    } else {
+                        throw new Error(data.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+                    }
+                })
+                .catch(error => {
+                    // แสดงข้อความ error ในรูปแบบ alert ที่เด่นชัด
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'ไม่สามารถแก้ไขได้',
+                            text: error.message,
+                            confirmButtonText: 'ตกลง',
+                            confirmButtonColor: '#d33'
+                        });
+                    }
+                    document.getElementById('editViolationFormErrorMessage').textContent = error.message;
+                    document.getElementById('editViolationFormError').style.display = 'block';
+                })
+                .finally(() => {
+                    // คืนสถานะปุ่ม
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalText;
+                });
         });
         return; // รอผลจาก SweetAlert
     }
@@ -2292,63 +2355,63 @@ function saveViolationEdit() {
         },
         body: formData
     })
-    .then(response => {
-        // ตรวจสอบสิทธิ์การเข้าถึง
-        if (response.status === 403) {
-            return response.json().then(data => {
-                throw new Error(data.message || 'คุณไม่มีสิทธิ์แก้ไขรายงานนี้');
-            });
-        }
-        if (!response.ok) {
-            throw new Error('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.success) {
-            document.getElementById('editViolationSuccessMessage').textContent = data.message || 'บันทึกการแก้ไขเรียบร้อยแล้ว';
-            document.getElementById('editViolationSuccess').style.display = 'block';
-            loadRecentReports();
-            setTimeout(() => { closeEditViolationSidebar(); }, 2000);
-        } else {
-            throw new Error(data.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-        }
-    })
-    .catch(error => {
-        // แสดงข้อความ error ในรูปแบบ alert ที่เด่นชัด
-        if (typeof Swal !== 'undefined') {
-            Swal.fire({
-                icon: 'error',
-                title: 'ไม่สามารถแก้ไขได้',
-                text: error.message,
-                confirmButtonText: 'ตกลง',
-                confirmButtonColor: '#d33'
-            });
-        }
-        document.getElementById('editViolationFormErrorMessage').textContent = error.message;
-        document.getElementById('editViolationFormError').style.display = 'block';
-    })
-    .finally(() => {
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = originalText;
-    });
+        .then(response => {
+            // ตรวจสอบสิทธิ์การเข้าถึง
+            if (response.status === 403) {
+                return response.json().then(data => {
+                    throw new Error(data.message || 'คุณไม่มีสิทธิ์แก้ไขรายงานนี้');
+                });
+            }
+            if (!response.ok) {
+                throw new Error('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                document.getElementById('editViolationSuccessMessage').textContent = data.message || 'บันทึกการแก้ไขเรียบร้อยแล้ว';
+                document.getElementById('editViolationSuccess').style.display = 'block';
+                loadRecentReports();
+                setTimeout(() => { closeEditViolationSidebar(); }, 2000);
+            } else {
+                throw new Error(data.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+            }
+        })
+        .catch(error => {
+            // แสดงข้อความ error ในรูปแบบ alert ที่เด่นชัด
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ไม่สามารถแก้ไขได้',
+                    text: error.message,
+                    confirmButtonText: 'ตกลง',
+                    confirmButtonColor: '#d33'
+                });
+            }
+            document.getElementById('editViolationFormErrorMessage').textContent = error.message;
+            document.getElementById('editViolationFormError').style.display = 'block';
+        })
+        .finally(() => {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalText;
+        });
 }
 
 // Laravel Log Viewer Functions
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // เพิ่ม event listener สำหรับปุ่ม Log
     const btnViewLog = document.getElementById('btnViewLog');
     const refreshLogBtn = document.getElementById('refreshLogBtn');
-    
+
     if (btnViewLog) {
-        btnViewLog.addEventListener('click', function(e) {
+        btnViewLog.addEventListener('click', function (e) {
             e.preventDefault();
             showLaravelLog();
         });
     }
-    
+
     if (refreshLogBtn) {
-        refreshLogBtn.addEventListener('click', function() {
+        refreshLogBtn.addEventListener('click', function () {
             loadLaravelLog();
         });
     }
@@ -2370,7 +2433,7 @@ function loadLaravelLog() {
     const logContainer = document.getElementById('logContainer');
     const logInfo = document.getElementById('logInfo');
     const refreshBtn = document.getElementById('refreshLogBtn');
-    
+
     // แสดง loading ที่สวยงาม
     logContainer.innerHTML = `
         <div class="text-center" style="color: #7d8590; margin-top: 100px;">
@@ -2378,10 +2441,10 @@ function loadLaravelLog() {
             <div style="font-size: 14px;">กำลังโหลดข้อมูล...</div>
         </div>
     `;
-    
+
     refreshBtn.disabled = true;
     refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> โหลด...';
-    
+
     fetch('/api/dashboard/laravel-log', {
         method: 'GET',
         headers: {
@@ -2389,50 +2452,50 @@ function loadLaravelLog() {
             'X-CSRF-TOKEN': behaviorReport.csrfToken
         }
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // ประมวลผลและแสดง log ที่สวยงาม
-            const formattedLog = formatLogContent(data.content);
-            logContainer.innerHTML = formattedLog || `
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // ประมวลผลและแสดง log ที่สวยงาม
+                const formattedLog = formatLogContent(data.content);
+                logContainer.innerHTML = formattedLog || `
                 <div class="text-center" style="color: #7d8590; margin-top: 100px;">
                     <div style="font-size: 24px; margin-bottom: 12px;">📝</div>
                     <div style="font-size: 14px;">ไฟล์ log ว่างเปล่า</div>
                 </div>
             `;
-            
-            // อัปเดตข้อมูลไฟล์
-            const fileSize = formatFileSize(data.file_size);
-            logInfo.textContent = `${data.lines_shown} บรรทัด • ${fileSize}`;
-            
-            // เลื่อนไปด้านล่างสุด
-            setTimeout(() => {
-                logContainer.scrollTop = logContainer.scrollHeight;
-            }, 100);
-        } else {
-            logContainer.innerHTML = `
+
+                // อัปเดตข้อมูลไฟล์
+                const fileSize = formatFileSize(data.file_size);
+                logInfo.textContent = `${data.lines_shown} บรรทัด • ${fileSize}`;
+
+                // เลื่อนไปด้านล่างสุด
+                setTimeout(() => {
+                    logContainer.scrollTop = logContainer.scrollHeight;
+                }, 100);
+            } else {
+                logContainer.innerHTML = `
                 <div class="text-center" style="color: #f85149; margin-top: 100px;">
                     <div style="font-size: 24px; margin-bottom: 12px;">⚠️</div>
                     <div style="font-size: 14px;">${data.message || 'ไม่สามารถโหลดไฟล์ log ได้'}</div>
                 </div>
             `;
-            logInfo.textContent = 'เกิดข้อผิดพลาด';
-        }
-    })
-    .catch(error => {
-        console.error('Error loading log:', error);
-        logContainer.innerHTML = `
+                logInfo.textContent = 'เกิดข้อผิดพลาด';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading log:', error);
+            logContainer.innerHTML = `
             <div class="text-center" style="color: #f85149; margin-top: 100px;">
                 <div style="font-size: 24px; margin-bottom: 12px;">🔌</div>
                 <div style="font-size: 14px;">เกิดข้อผิดพลาดในการเชื่อมต่อ</div>
             </div>
         `;
-        logInfo.textContent = 'เกิดข้อผิดพลาด';
-    })
-    .finally(() => {
-        refreshBtn.disabled = false;
-        refreshBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> รีเฟรช';
-    });
+            logInfo.textContent = 'เกิดข้อผิดพลาด';
+        })
+        .finally(() => {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> รีเฟรช';
+        });
 }
 
 /**
@@ -2440,20 +2503,20 @@ function loadLaravelLog() {
  */
 function formatLogContent(content) {
     if (!content) return '';
-    
+
     // แยกบรรทัดและจัดรูปแบบ
     const lines = content.split('\n');
     let formattedHtml = '';
-    
+
     lines.forEach(line => {
         if (!line.trim()) {
             formattedHtml += '<br>';
             return;
         }
-        
+
         let className = '';
         let icon = '';
-        
+
         // กำหนดสีและไอคอนตาม log level
         if (line.includes('[ERROR]') || line.includes('ERROR:')) {
             className = 'log-error';
@@ -2470,12 +2533,12 @@ function formatLogContent(content) {
         } else {
             className = 'log-default';
         }
-        
+
         // Escape HTML และเพิ่ม styling
         const escapedLine = escapeHtml(line);
         formattedHtml += `<div class="${className}" style="margin-bottom: 4px; word-wrap: break-word;">${icon}${escapedLine}</div>`;
     });
-    
+
     return `
         <style>
             .log-error { color: #ff6b6b; }
