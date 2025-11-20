@@ -228,6 +228,10 @@ class BehaviorReportController extends Controller
             $searchTerm = trim($request->input('term', ''));
             $classId = $request->input('class_id', '');
             
+            // Sanitize input
+            $searchTerm = strip_tags($searchTerm);
+            $searchTerm = preg_replace('/[^ก-๙a-zA-Z0-9\s]/u', '', $searchTerm);
+
             $query = DB::table('tb_students as s')
                 ->join('tb_users as u', 's.user_id', '=', 'u.users_id')
                 ->leftJoin('tb_classes as c', 's.class_id', '=', 'c.classes_id')

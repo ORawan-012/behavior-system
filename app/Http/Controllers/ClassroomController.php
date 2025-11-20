@@ -26,7 +26,9 @@ class ClassroomController extends Controller
             $query = ClassRoom::with(['teacher', 'teacher.user'])
                                ->has('students'); // แสดงเฉพาะห้องที่มีนักเรียน
             
-            $searchTerm = $request->get('search', '');
+            $searchTerm = trim($request->get('search', ''));
+            $searchTerm = strip_tags($searchTerm);
+            $searchTerm = preg_replace('/[^ก-๙a-zA-Z0-9\s]/u', '', $searchTerm);
             $academicYear = $request->get('academicYear', '');
             $level = $request->get('level', '');
             $perPage = $request->get('perPage', 10);
@@ -324,7 +326,9 @@ class ClassroomController extends Controller
                     ], 403);
                 }
             }
-            $searchTerm = $request->get('search', '');
+            $searchTerm = trim($request->get('search', ''));
+            $searchTerm = strip_tags($searchTerm);
+            $searchTerm = preg_replace('/[^ก-๙a-zA-Z0-9\s]/u', '', $searchTerm);
             $perPage = $request->get('perPage', 10); // Default to 10 students per page
             
             // Use eager loading for the 'user' relationship

@@ -123,36 +123,47 @@ class ParentController extends Controller
 
     public function searchStudents(Request $request)
     {
-        $user = Auth::user();
-        if ($user->users_role !== 'guardian') {
-            return response()->json(['success' => false, 'message' => 'ไม่อนุญาต'], 403);
+        try {
+            $user = Auth::user();
+            if ($user->users_role !== 'guardian') {
+                return response()->json(['success' => false, 'message' => 'ไม่อนุญาต'], 403);
+            }
+            $term = trim($request->get('q',''));
+            $term = strip_tags($term);
+            $term = preg_replace('/[^ก-๙a-zA-Z0-9\s]/u', '', $term);
+            if ($term === '') {
+                return response()->json(['success' => true, 'data' => []]);
+            }
+            $students = Student::with(['user','classroom'])
+                ->where(function($q) use ($term){
+                    $q->where('students_student_code', 'LIKE', "%$term%")
+                      ->orWhereHas('user', function($uq) use ($term){
+                          $uq->whereRaw("CONCAT(users_first_name,' ',users_last_name) LIKE ?", ["%$term%"])
+                             ->orWhere('users_first_name', 'LIKE', "%$term%")
+                             ->orWhere('users_last_name', 'LIKE', "%$term%")
+                             ->orWhere('users_email', 'LIKE', "%$term%");
+                      });
+                })
+                ->orderBy('students_student_code')
+                ->limit(15)
+                ->get()
+                ->map(function($s){
+                    return [
+                        'id' => $s->students_id,
+                        'code' => $s->students_student_code,
+                        'name' => ($s->user->users_name_prefix ?? '').($s->user->users_first_name ?? '').' '.($s->user->users_last_name ?? ''),
+                        'class' => $s->classroom ? ($s->classroom->classes_level.'/'.$s->classroom->classes_room_number) : '-',
+                    ];
+                });
+            return response()->json(['success' => true, 'data' => $students]);
+        } catch (\Exception $e) {
+            \Log::error('Error searching students for parent: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'เกิดข้อผิดพลาดในการค้นหานักเรียน',
+                'error' => $e->getMessage()
+            ], 500);
         }
-        $term = trim($request->get('q',''));
-        if ($term === '') {
-            return response()->json(['success' => true, 'data' => []]);
-        }
-        $students = Student::with(['user','classroom'])
-            ->where(function($q) use ($term){
-                $q->where('students_student_code', 'LIKE', "%$term%")
-                  ->orWhereHas('user', function($uq) use ($term){
-                      $uq->whereRaw("CONCAT(users_first_name,' ',users_last_name) LIKE ?", ["%$term%"])
-                         ->orWhere('users_first_name', 'LIKE', "%$term%")
-                         ->orWhere('users_last_name', 'LIKE', "%$term%")
-                         ->orWhere('users_email', 'LIKE', "%$term%");
-                  });
-            })
-            ->orderBy('students_student_code')
-            ->limit(15)
-            ->get()
-            ->map(function($s){
-                return [
-                    'id' => $s->students_id,
-                    'code' => $s->students_student_code,
-                    'name' => ($s->user->users_name_prefix ?? '').($s->user->users_first_name ?? '').' '.($s->user->users_last_name ?? ''),
-                    'class' => $s->classroom ? ($s->classroom->classes_level.'/'.$s->classroom->classes_room_number) : '-',
-                ];
-            });
-        return response()->json(['success' => true, 'data' => $students]);
     }
 
     public function linkStudent(Request $request)
