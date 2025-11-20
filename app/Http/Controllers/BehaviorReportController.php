@@ -26,6 +26,9 @@ class BehaviorReportController extends Controller
      */
     public function store(Request $request)
     {
+        // Start transaction
+        DB::beginTransaction();
+
         try {
             // Validate input data
             $validator = Validator::make($request->all(), [
@@ -101,6 +104,7 @@ class BehaviorReportController extends Controller
             // Get student data
             $student = DB::table('tb_students')
                 ->where('students_id', $request->student_id)
+                ->lockForUpdate() // Lock row for update
                 ->first();
 
             if (!$student) {
@@ -174,6 +178,8 @@ class BehaviorReportController extends Controller
                 ]);
             }
 
+            DB::commit();
+
             return response()->json([
                 'success' => true,
                 'message' => 'บันทึกพฤติกรรมสำเร็จ',
@@ -192,7 +198,14 @@ class BehaviorReportController extends Controller
             ], 201);
 
         } catch (\Exception $e) {
+            DB::rollback();
             Log::error('Error saving behavior report: ' . $e->getMessage());
+            
+            // If file was uploaded but transaction failed, we should delete the file
+            if (isset($evidencePath) && Storage::disk('public')->exists($evidencePath)) {
+                Storage::disk('public')->delete($evidencePath);
+            }
+            
             return response()->json([
                 'success' => false,
                 'message' => 'เกิดข้อผิดพลาดในการบันทึกพฤติกรรม',
@@ -230,7 +243,7 @@ class BehaviorReportController extends Controller
                     'c.classes_room_number'
                 );
             
-            // Apply search filters - ค้นหาแบบ flexible มากขึ้น
+            // Apply search filters - ใช้ parameter binding เพื่อป้องกัน SQL Injection
             if (!empty($searchTerm)) {
                 $query->where(function($q) use ($searchTerm) {
                     // แยกคำค้นหาออกเป็นคำๆ
@@ -244,8 +257,9 @@ class BehaviorReportController extends Controller
                                  ->orWhere('u.users_last_name', 'LIKE', '%' . $term . '%')
                                  ->orWhere('u.users_name_prefix', 'LIKE', '%' . $term . '%')
                                  ->orWhere('s.students_student_code', 'LIKE', '%' . $term . '%')
-                                 ->orWhere(DB::raw("CONCAT(u.users_name_prefix, u.users_first_name, ' ', u.users_last_name)"), 'LIKE', '%' . $term . '%')
-                                 ->orWhere(DB::raw("CONCAT(u.users_first_name, ' ', u.users_last_name)"), 'LIKE', '%' . $term . '%');
+                                 // ใช้ whereRaw กับ parameter binding แทน DB::raw
+                                 ->orWhereRaw("CONCAT(u.users_name_prefix, u.users_first_name, ' ', u.users_last_name) LIKE ?", ['%' . $term . '%'])
+                                 ->orWhereRaw("CONCAT(u.users_first_name, ' ', u.users_last_name) LIKE ?", ['%' . $term . '%']);
                         });
                     }
                 });
@@ -255,7 +269,7 @@ class BehaviorReportController extends Controller
                 $query->where('s.class_id', $classId);
             }
             
-            // เรียงลำดับตามความเกี่ยวข้อง
+            // เรียงลำดับตามความเกี่ยวข้อง - ใช้ parameter binding
             $query->orderByRaw("
                 CASE 
                     WHEN s.students_student_code LIKE ? THEN 1

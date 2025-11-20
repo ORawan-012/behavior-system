@@ -135,7 +135,7 @@ class ParentController extends Controller
             ->where(function($q) use ($term){
                 $q->where('students_student_code', 'LIKE', "%$term%")
                   ->orWhereHas('user', function($uq) use ($term){
-                      $uq->where(DB::raw("CONCAT(users_first_name,' ',users_last_name)"), 'LIKE', "%$term%")
+                      $uq->whereRaw("CONCAT(users_first_name,' ',users_last_name) LIKE ?", ["%$term%"])
                          ->orWhere('users_first_name', 'LIKE', "%$term%")
                          ->orWhere('users_last_name', 'LIKE', "%$term%")
                          ->orWhere('users_email', 'LIKE', "%$term%");

@@ -202,10 +202,10 @@ class AuthController extends Controller
                 $terms = explode(' ', $search);
                 
                 return $query->where(function($q) use ($search, $terms) {
-                    // ค้นหาแบบเต็ม (ทั้งประโยค)
+                    // ค้นหาแบบเต็ม (ทั้งประโยค) - ใช้ parameter binding
                     $q->whereHas('user', function($subquery) use ($search) {
-                        $subquery->where(DB::raw("CONCAT(users_name_prefix, users_first_name, ' ', users_last_name)"), 'like', "%{$search}%")
-                                ->orWhere(DB::raw("CONCAT(users_first_name, ' ', users_last_name)"), 'like', "%{$search}%")
+                        $subquery->whereRaw("CONCAT(users_name_prefix, users_first_name, ' ', users_last_name) LIKE ?", ["%{$search}%"])
+                                ->orWhereRaw("CONCAT(users_first_name, ' ', users_last_name) LIKE ?", ["%{$search}%"])
                                 ->orWhere('users_first_name', 'like', "%{$search}%")
                                 ->orWhere('users_last_name', 'like', "%{$search}%")
                                 ->orWhere('users_name_prefix', 'like', "%{$search}%");

@@ -54,13 +54,13 @@ class ClassroomController extends Controller
                 }
             }
             
-            // ค้นหาตาม search term
+            // ค้นหาตาม search term - ใช้ parameter binding
             if (!empty($searchTerm)) {
                 $query->where(function($q) use ($searchTerm) {
                     $q->where('classes_level', 'LIKE', "%{$searchTerm}%")
                       ->orWhere('classes_room_number', 'LIKE', "%{$searchTerm}%")
                       ->orWhereHas('teacher.user', function($subQ) use ($searchTerm) {
-                          $subQ->where(DB::raw("CONCAT(users_first_name, ' ', users_last_name)"), 'LIKE', "%{$searchTerm}%");
+                          $subQ->whereRaw("CONCAT(users_first_name, ' ', users_last_name) LIKE ?", ["%{$searchTerm}%"]);
                       });
                 });
             }
@@ -333,11 +333,11 @@ class ClassroomController extends Controller
             if (!empty($searchTerm)) {
                 $query->where(function($q) use ($searchTerm) {
                     $q->where('students_student_code', 'LIKE', "%{$searchTerm}%")
-                      // Search within the related 'user' table
+                      // Search within the related 'user' table - ใช้ parameter binding
                       ->orWhereHas('user', function($userQuery) use ($searchTerm) {
                           $userQuery->where('users_first_name', 'LIKE', "%{$searchTerm}%")
                                     ->orWhere('users_last_name', 'LIKE', "%{$searchTerm}%")
-                                    ->orWhere(DB::raw("CONCAT(IFNULL(users_name_prefix, ''), users_first_name, ' ', users_last_name)"), 'LIKE', "%{$searchTerm}%");
+                                    ->orWhereRaw("CONCAT(IFNULL(users_name_prefix, ''), users_first_name, ' ', users_last_name) LIKE ?", ["%{$searchTerm}%"]);
                       });
                 });
             }
