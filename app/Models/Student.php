@@ -34,6 +34,65 @@ class Student extends Model
 {
     use HasFactory;
 
+    // Status Constants
+    const STATUS_ACTIVE = 'active';
+    const STATUS_GRADUATED = 'graduated'; // or 'graduate' based on DB usage, normalizing to 'graduated'
+    const STATUS_TRANSFERRED = 'transferred';
+    const STATUS_SUSPENDED = 'suspended';
+    const STATUS_EXPELLED = 'expelled';
+
+    /**
+     * Get all available statuses
+     */
+    public static function getStatuses()
+    {
+        return [
+            self::STATUS_ACTIVE,
+            self::STATUS_GRADUATED,
+            self::STATUS_TRANSFERRED,
+            self::STATUS_SUSPENDED,
+            self::STATUS_EXPELLED,
+        ];
+    }
+
+    /**
+     * Get status label in Thai
+     */
+    public static function getStatusLabel($status)
+    {
+        $labels = [
+            self::STATUS_ACTIVE => 'กำลังศึกษา',
+            self::STATUS_GRADUATED => 'จบการศึกษา',
+            'graduate' => 'จบการศึกษา', // Handle legacy/inconsistent data
+            self::STATUS_TRANSFERRED => 'ย้ายโรงเรียน',
+            self::STATUS_SUSPENDED => 'พักการเรียน',
+            self::STATUS_EXPELLED => 'ถูกไล่ออก',
+        ];
+
+        return $labels[$status] ?? $status;
+    }
+
+    /**
+     * Normalize status input
+     */
+    public static function normalizeStatus($status)
+    {
+        if (!$status) return $status;
+        
+        $status = strtolower(trim($status));
+        
+        $map = [
+            'graduate' => self::STATUS_GRADUATED,
+            'graduated' => self::STATUS_GRADUATED,
+            'expelled' => self::STATUS_EXPELLED,
+            'suspended' => self::STATUS_SUSPENDED,
+            'transferred' => self::STATUS_TRANSFERRED,
+            'active' => self::STATUS_ACTIVE
+        ];
+
+        return $map[$status] ?? $status;
+    }
+
     /**
      * ตารางที่เชื่อมโยง
      */
