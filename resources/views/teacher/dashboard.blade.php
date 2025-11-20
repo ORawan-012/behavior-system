@@ -5087,10 +5087,11 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             #userManagementModal .minimal-card {
-                padding: 1.2rem 1.3rem;
-            }
+        #userManagementModal .minimal-card {
+            padding: 1.2rem 1.3rem;
         }
-    </style>
+    }
+</style>
 
 </body>
 
