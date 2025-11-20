@@ -10,6 +10,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- SweetAlert2 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <!-- Custom Styles -->
     <link rel="stylesheet" href="{{ asset('css/app.css') }}">
     <style>
@@ -697,7 +699,7 @@
                                 <input type="checkbox" class="form-check-input" id="teacherRemember" name="remember">
                                 <label class="form-check-label" for="teacherRemember">จดจำฉัน</label>
                             </div>
-                            <a href="#" class="btn-link text-muted">ลืมรหัสผ่าน?</a>
+                            <a href="#" class="btn-link text-muted" onclick="showForgotPasswordModal('teacher'); return false;">ลืมรหัสผ่าน?</a>
                         </div>
                         <button type="submit" class="btn btn-accent-app btn-lg w-100 d-flex align-items-center justify-content-center">
                             <span class="btn-text">เข้าสู่ระบบ</span>
@@ -741,7 +743,7 @@
                                 <input type="checkbox" class="form-check-input" id="studentRemember" name="remember">
                                 <label class="form-check-label" for="studentRemember">จดจำฉัน</label>
                             </div>
-                            <a href="#" class="btn-link text-muted">ลืมรหัสผ่าน?</a>
+                            <a href="#" class="btn-link text-muted" onclick="showForgotPasswordModal('student'); return false;">ลืมรหัสผ่าน?</a>
                         </div>
                         <button type="submit" class="btn btn-accent-app btn-lg w-100 d-flex align-items-center justify-content-center">
                             <span class="btn-text">เข้าสู่ระบบ</span>
@@ -812,10 +814,41 @@
     <!-- Bootstrap JS bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
     
+    <!-- SweetAlert2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
     <!-- Particles.js -->
     <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
     
     <script>
+        // ฟังก์ชันแสดง SweetAlert สำหรับลืมรหัสผ่าน
+        function showForgotPasswordModal(role) {
+            let title = 'ลืมรหัสผ่าน?';
+            let message = '';
+            let icon = 'info';
+            
+            // กำหนดข้อความตาม role
+            if (role === 'teacher') {
+                title = 'ลืมรหัสผ่าน - ครู';
+                message = '<p class="mb-0">กรุณาติดต่อ <strong>ผู้ดูแลระบบ</strong> หรือ <strong>เจ้าหน้าที่ IT</strong> เพื่อขอรับรหัสผ่านใหม่</p>';
+            } else if (role === 'student') {
+                title = 'ลืมรหัสผ่าน - นักเรียน';
+                message = '<p class="mb-0">กรุณาติดต่อ <strong>ครูประจำชั้น</strong> เพื่อขอรับรหัสผ่านใหม่</p>';
+            }
+            
+            Swal.fire({
+                icon: icon,
+                title: title,
+                html: message,
+                confirmButtonText: 'รับทราบ',
+                confirmButtonColor: '#95A4D8',
+                customClass: {
+                    popup: 'rounded-3',
+                    confirmButton: 'px-4 py-2'
+                }
+            });
+        }
+        
         // คำสั่ง JavaScript สำหรับ login.blade.php
         document.addEventListener('DOMContentLoaded', function() {
             // Initialize particles background for desktop only
