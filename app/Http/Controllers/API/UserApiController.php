@@ -137,8 +137,8 @@ class UserApiController extends Controller
                 $rules['students_student_code'] = 'required|string|max:20|unique:tb_students,students_student_code,' . ($user->student->students_id ?? 0) . ',students_id';
                 $rules['class_id'] = 'required|exists:tb_classes,classes_id';
                 $rules['students_academic_year'] = 'nullable|string|max:20';
-                $rules['stude,ntransferredts_gender'] = 'nullable|in:male,female,other';
-                $rules['students_status'] = 'nullable|in:active,suspended,expelled,graduate, transferred';
+                $rules['students_gender'] = 'nullable|in:male,female,other';
+                $rules['students_status'] = 'nullable|in:active,suspended,expelled,graduate,transferred';
                 $rules['students_current_score'] = 'nullable|integer';
             } elseif ($user->users_role === 'teacher') {
                 $rules['teachers_employee_code'] = 'nullable|string|max:20|unique:tb_teachers,teachers_employee_code,' . ($user->teacher->teachers_id ?? 0) . ',teachers_id';

@@ -95,7 +95,7 @@ class StudentController extends Controller
             Log::error('Error in dashboard: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());
             
-            return view('errors.500', ['message' => 'เกิดข้อผิดพลาดในการโหลดข้อมูล Dashboard']);
+            return redirect()->back()->with('error', 'เกิดข้อผิดพลาดในการโหลดข้อมูล Dashboard กรุณาลองใหม่อีกครั้ง');
         }
     }
     
@@ -343,5 +343,173 @@ class StudentController extends Controller
                 ]
             ]
         ];
+    }
+    
+    /**
+     * Get student's rank in class
+     */
+    private function getStudentRank($studentId, $classId)
+    {
+        if (!$classId) return 0;
+        
+        $rank = DB::table('tb_students')
+            ->where('class_id', $classId)
+            ->where('students_current_score', '>', function($query) use ($studentId) {
+                $query->select('students_current_score')
+                    ->from('tb_students')
+                    ->where('students_id', $studentId)
+                    ->limit(1);
+            })
+            ->count();
+            
+        return $rank + 1;
+    }
+    
+    /**
+     * Get total students in class
+     */
+    private function getClassTotalStudents($classId)
+    {
+        if (!$classId) return 0;
+        
+        return DB::table('tb_students')
+            ->where('class_id', $classId)
+            ->count();
+    }
+    
+    /**
+     * Get rank status based on score
+     */
+    private function getRankStatus($score)
+    {
+        if ($score >= 90) {
+            return [
+                'label' => 'ดีเยี่ยม',
+                'badge' => 'bg-success',
+                'group' => 'กลุ่มยอดเยี่ยม'
+            ];
+        } elseif ($score >= 80) {
+            return [
+                'label' => 'ดี',
+                'badge' => 'bg-primary',
+                'group' => 'กลุ่มดี'
+            ];
+        } elseif ($score >= 70) {
+            return [
+                'label' => 'พอใช้',
+                'badge' => 'bg-warning',
+                'group' => 'กลุ่มพอใช้'
+            ];
+        } else {
+            return [
+                'label' => 'ต้องปรับปรุง',
+                'badge' => 'bg-danger',
+                'group' => 'กลุ่มต้องปรับปรุง'
+            ];
+        }
+    }
+    
+    /**
+     * Get classroom details
+     */
+    private function getClassroomDetails($classId)
+    {
+        if (!$classId) return null;
+        
+        $classroom = DB::table('tb_classes')
+            ->leftJoin('tb_teachers', 'tb_classes.teachers_id', '=', 'tb_teachers.teachers_id')
+            ->leftJoin('tb_users', 'tb_teachers.users_id', '=', 'tb_users.users_id')
+            ->where('tb_classes.classes_id', $classId)
+            ->select(
+                'tb_classes.*',
+                'tb_users.users_name_prefix',
+                'tb_users.users_first_name',
+                'tb_users.users_last_name'
+            )
+            ->first();
+            
+        if (!$classroom) return null;
+
+        // Calculate stats
+        $stats = DB::table('tb_students')
+            ->where('class_id', $classId)
+            ->select(
+                DB::raw('count(*) as total'),
+                DB::raw('max(students_current_score) as max_score'),
+                DB::raw('avg(students_current_score) as avg_score')
+            )
+            ->first();
+
+        $teacherName = 'ไม่ระบุ';
+        if ($classroom->users_first_name) {
+            $teacherName = ($classroom->users_name_prefix ?? '') . $classroom->users_first_name . ' ' . ($classroom->users_last_name ?? '');
+        }
+
+        return [
+            'name' => $classroom->classes_level . '/' . $classroom->classes_room_number,
+            'teacher_name' => $teacherName,
+            'academic_year' => $classroom->classes_academic_year ?? date('Y'),
+            'total_students' => $stats->total ?? 0,
+            'highest_score' => $stats->max_score ?? 0,
+            'average_score' => number_format($stats->avg_score ?? 0, 2)
+        ];
+    }
+    
+    /**
+     * Get top students in class
+     */
+    private function getTopStudentsInClass($classId, $currentStudentId, $limit = 5)
+    {
+        if (!$classId) return collect([]);
+        
+        $students = DB::table('tb_students')
+            ->leftJoin('tb_users', 'tb_students.user_id', '=', 'tb_users.users_id')
+            ->where('tb_students.class_id', $classId)
+            ->orderBy('tb_students.students_current_score', 'desc')
+            ->limit($limit)
+            ->select(
+                'tb_students.students_id',
+                'tb_students.students_current_score',
+                'tb_users.users_name_prefix',
+                'tb_users.users_first_name',
+                'tb_users.users_last_name'
+            )
+            ->get();
+            
+        return $students->map(function ($student, $index) use ($currentStudentId) {
+            $name = 'ไม่ระบุ';
+            if ($student->users_first_name) {
+                $name = ($student->users_name_prefix ?? '') . $student->users_first_name . ' ' . ($student->users_last_name ?? '');
+            }
+            
+            return [
+                'rank' => $index + 1,
+                'name' => $name,
+                'score' => $student->students_current_score,
+                'is_current' => $student->students_id == $currentStudentId
+            ];
+        });
+    }
+    
+    /**
+     * Get student notifications
+     */
+    private function getStudentNotifications($userId, $limit = 5)
+    {
+        $notifications = DB::table('tb_notifications')
+            ->where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get();
+            
+        return $notifications->map(function ($notification) {
+            return [
+                'is_read' => !is_null($notification->read_at),
+                'type' => $notification->type ?? 'info',
+                'title' => $notification->title ?? 'แจ้งเตือน',
+                'message' => $notification->message ?? '',
+                'created_at' => Carbon::parse($notification->created_at)->locale('th')->diffForHumans()
+            ];
+        });
     }
 }

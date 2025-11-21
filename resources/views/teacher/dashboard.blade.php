@@ -4667,9 +4667,10 @@ document.addEventListener('DOMContentLoaded', function () {
                                             </label>
                                             <select class="form-select" id="editStudentStatus" name="students_status">
                                                 <option value="active">กำลังศึกษา</option>
-                                                <option value="suspended">พักการศึกษา</option>
+                                                <option value="suspended">พักการเรียน</option>
                                                 <option value="expelled">พ้นสภาพ/ลาออก</option>
                                                 <option value="graduate">จบการศึกษา</option>
+                                                <option value="transferred">ย้ายสถานศึกษา</option>
                                             </select>
                                         </div>
                                         <div class="col-md-6">

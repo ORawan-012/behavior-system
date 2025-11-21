@@ -172,7 +172,6 @@ class UserManagement {
 
             const response = await fetch(`/api/users?${params}`);
             const data = await response.json();
-            console.log('[UserManagement] loadUsers response stats:', data?.stats);
 
             if (loadingDiv) loadingDiv.style.display = 'none';
 
@@ -386,7 +385,6 @@ class UserManagement {
 
     updateStats(stats) {
         // Debug log (สามารถลบได้ภายหลัง)
-        console.log('[UserManagement] updateStats raw:', stats);
         // Enhanced stats update with more detailed information
         if (document.getElementById('totalUsersCount')) {
             document.getElementById('totalUsersCount').textContent = stats?.total || 0;
@@ -623,7 +621,7 @@ class UserManagement {
             const genderNames = { 'male': 'ชาย', 'female': 'หญิง', 'other': 'อื่นๆ' };
             document.getElementById('studentGender').textContent = genderNames[user.student.students_gender] || '-';
             
-            const statusNames = { 'active': '🟢 กำลังศึกษา', 'suspended': '⏸️ พักการศึกษา', 'expelled': '🔴 ออกจากการศึกษา', 'graduate': '🎓 จบการศึกษา' };
+            const statusNames = { 'active': '🟢 กำลังศึกษา', 'suspended': '⏸️ พักการศึกษา', 'expelled': '🔴 ออกจากการศึกษา', 'graduate': '🎓 จบการศึกษา', 'transferred': '🏫 ย้ายสถานศึกษา' };
             document.getElementById('studentStatus').textContent = statusNames[user.student.students_status] || '-';
             
             document.getElementById('studentAcademicYear').textContent = user.student.students_academic_year || '-';
@@ -865,6 +863,24 @@ class UserManagement {
             data[key] = value;
         }
 
+        // Clean up empty strings for nullable fields to avoid validation errors
+        const nullableFields = [
+            'students_academic_year', 
+            'students_gender', 
+            'students_current_score',
+            'teachers_employee_code',
+            'teachers_position',
+            'teachers_department',
+            'teachers_major',
+            'assigned_class_id'
+        ];
+
+        nullableFields.forEach(field => {
+            if (data[field] === '') {
+                data[field] = null;
+            }
+        });
+
         // Handle checkbox
         data.users_active = document.getElementById('editUserActive').checked ? 1 : 0;
         // Normalize booleans
@@ -905,12 +921,13 @@ class UserManagement {
             if (result.success) {
                 this.showSuccess(result.message);
                 
-                // Close modal and reload users
-                const modal = bootstrap.Modal.getInstance(document.getElementById('userDetailSlider'));
-                if (modal) modal.hide();
-                
+                // Reload users list in background
                 this.loadUsers(this.currentPage);
+
+                // Reload user details to reflect changes without closing modal
+                await this.loadUserDetails(userId);
             } else {
+                console.error('Save user error:', result);
                 if (result.errors) {
                     let errorMessages = '';
                     Object.keys(result.errors).forEach(key => {
@@ -1131,11 +1148,14 @@ class UserManagement {
 
     showSuccess(message) {
         Swal.fire({
+            toast: true,
+            position: 'top-end',
             icon: 'success',
             title: 'สำเร็จ',
             text: message,
-            timer: 2000,
-            showConfirmButton: false
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true
         });
     }
 }
