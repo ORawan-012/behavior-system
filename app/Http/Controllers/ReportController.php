@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Student;
 use App\Models\Classroom;
 use App\Models\BehaviorReport;
+use App\Services\AcademicYearService;
 use Mpdf\Mpdf; // แทน use PDF; ด้วย Mpdf
 use Carbon\Carbon;
 
@@ -406,6 +407,72 @@ class ReportController extends Controller
                 return 'ความเสี่ยงต่ำ';
             default:
                 return 'ทุกระดับ';
+        }
+    }
+
+    /**
+     * คืนค่าเดือนที่มีรายงานพฤติกรรมภายในปีการศึกษาปัจจุบัน
+     */
+    public function availableMonths(Request $request, AcademicYearService $academicYearService)
+    {
+        try {
+            $academicYearBE = $academicYearService->getCurrentAcademicYear();
+            $academicYearAD = $academicYearBE - 543; // เก็บเป็น ค.ศ. สำหรับ Carbon
+
+            $semester1 = config('academic.semester_periods.1');
+            $semester2 = config('academic.semester_periods.2');
+
+            // วันที่เริ่มปีการศึกษา (ภาคเรียน 1)
+            $startDate = Carbon::createFromDate(
+                $academicYearAD,
+                $semester1['start_month'],
+                $semester1['start_day']
+            )->startOfDay();
+
+            // วันที่สิ้นสุดปีการศึกษา (สิ้นสุดภาคเรียน 2)
+            $endDate = Carbon::createFromDate(
+                $academicYearAD,
+                $semester2['end_month'],
+                $semester2['end_day']
+            )->endOfDay();
+
+            // หากเดือนสิ้นสุดอยู่ก่อนเดือนเริ่ม ให้ขยับไปปีถัดไป (ครอบคลุมปีการศึกษาที่กิน 2 ปี)
+            if ($endDate->lt($startDate)) {
+                $endDate->addYear();
+            }
+
+            $availableMonths = BehaviorReport::query()
+                ->selectRaw('YEAR(reports_report_date) as year, MONTH(reports_report_date) as month, COUNT(*) as total_reports')
+                ->whereBetween('reports_report_date', [$startDate, $endDate])
+                ->groupBy('year', 'month')
+                ->orderByDesc('year')
+                ->orderByDesc('month')
+                ->get()
+                ->map(function ($row) {
+                    return [
+                        'year' => (int) $row->year,
+                        'month' => (int) $row->month,
+                        'total_reports' => (int) $row->total_reports,
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'ดึงข้อมูลเดือนที่มีรายงานสำเร็จ',
+                'data' => [
+                    'academic_year_be' => $academicYearBE,
+                    'academic_year_ad' => $academicYearAD,
+                    'start_date' => $startDate->toDateString(),
+                    'end_date' => $endDate->toDateString(),
+                    'months' => $availableMonths,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ไม่สามารถดึงข้อมูลเดือนที่มีรายงานได้',
+                'error' => $e->getMessage(),
+            ], 500);
         }
     }
 }

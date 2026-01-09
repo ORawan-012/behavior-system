@@ -9,6 +9,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ClassroomController;
 use App\Http\Controllers\API\StudentReportController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ReportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -46,6 +47,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/violations/{id}', [ViolationController::class, 'show']);
     Route::put('/violations/{id}', [ViolationController::class, 'update']);
     Route::delete('/violations/{id}', [ViolationController::class, 'destroy']);
+        
+        // Report filters
+        Route::prefix('reports')->group(function () {
+            Route::get('/available-months', [ReportController::class, 'availableMonths']);
+        });
 
     Route::get('/dashboard/trends', [DashboardController::class, 'getMonthlyTrends']);
     Route::get('/dashboard/violations', [DashboardController::class, 'getViolationTypes']);

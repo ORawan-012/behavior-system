@@ -1,8 +1,199 @@
+const THAI_MONTHS = {
+    1: 'มกราคม',
+    2: 'กุมภาพันธ์',
+    3: 'มีนาคม',
+    4: 'เมษายน',
+    5: 'พฤษภาคม',
+    6: 'มิถุนายน',
+    7: 'กรกฎาคม',
+    8: 'สิงหาคม',
+    9: 'กันยายน',
+    10: 'ตุลาคม',
+    11: 'พฤศจิกายน',
+    12: 'ธันวาคม'
+};
+
+const REPORT_SELECT_PAIRS = [
+    { monthId: 'report_month', yearId: 'report_year' },
+    { monthId: 'risk_report_month', yearId: 'risk_report_year' },
+    { monthId: 'all_data_report_month', yearId: 'all_data_report_year' }
+];
+
+const REPORT_CLASS_SELECTS = [
+    'report_class_id',
+    'risk_report_class_id',
+    'all_data_report_class_id'
+];
+
+const reportFilterState = {
+    monthsByYear: {},
+    years: [],
+    classes: [],
+    readyPromise: null
+};
+
+/**
+ * ดึงข้อมูลเดือนที่มีรายงานในปีการศึกษาปัจจุบัน
+ */
+async function fetchAvailableMonths() {
+    const response = await fetch('/api/reports/available-months', {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    if (!response.ok) {
+        throw new Error('ไม่สามารถดึงเดือนที่มีรายงานได้');
+    }
+    const payload = await response.json();
+    if (!payload.success) {
+        throw new Error(payload.message || 'ไม่สามารถดึงเดือนที่มีรายงานได้');
+    }
+    const months = payload.data?.months || [];
+    const monthsByYear = {};
+    const yearsSet = new Set();
+
+    months.forEach(({ year, month }) => {
+        yearsSet.add(year);
+        if (!monthsByYear[year]) {
+            monthsByYear[year] = [];
+        }
+        monthsByYear[year].push(month);
+    });
+
+    // เรียงข้อมูลล่าสุดก่อน
+    const years = Array.from(yearsSet).sort((a, b) => b - a);
+    Object.keys(monthsByYear).forEach((year) => {
+        monthsByYear[year] = monthsByYear[year].sort((a, b) => b - a);
+    });
+
+    return { monthsByYear, years };
+}
+
+/**
+ * ดึงข้อมูลชั้นเรียนจากฐานข้อมูล
+ */
+async function fetchClasses() {
+    const response = await fetch('/api/classes/all', {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    if (!response.ok) {
+        throw new Error('ไม่สามารถดึงข้อมูลชั้นเรียนได้');
+    }
+    const payload = await response.json();
+    if (!payload.success) {
+        throw new Error(payload.message || 'ไม่สามารถดึงข้อมูลชั้นเรียนได้');
+    }
+    return payload.data || [];
+}
+
+function setYearOptions(yearSelect, years) {
+    if (!yearSelect) return;
+    yearSelect.innerHTML = '';
+    years.forEach((year) => {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year + 543; // แสดง พ.ศ. แต่เก็บ ค.ศ.
+        yearSelect.appendChild(option);
+    });
+}
+
+function setMonthOptions(monthSelect, months, selectedYear) {
+    if (!monthSelect) return;
+    monthSelect.innerHTML = '';
+    months.forEach((month) => {
+        const option = document.createElement('option');
+        option.value = month;
+        option.textContent = THAI_MONTHS[month] || month;
+        option.dataset.year = selectedYear;
+        monthSelect.appendChild(option);
+    });
+}
+
+function setClassOptions(selectEl, classes) {
+    if (!selectEl) return;
+    selectEl.innerHTML = '';
+    const allOpt = document.createElement('option');
+    allOpt.value = '';
+    allOpt.textContent = 'ทุกชั้นเรียน';
+    selectEl.appendChild(allOpt);
+
+    classes.forEach((cls) => {
+        const option = document.createElement('option');
+        option.value = cls.classes_id;
+        option.textContent = `${cls.classes_level} / ห้อง ${cls.classes_room_number}`;
+        selectEl.appendChild(option);
+    });
+}
+
+function applyDefaultSelection(yearEl, monthEl, state) {
+    if (!yearEl || !monthEl) return;
+    const defaultYear = state.years[0];
+    yearEl.value = defaultYear ?? '';
+    const months = state.monthsByYear[defaultYear] || [];
+    setMonthOptions(monthEl, months, defaultYear);
+    if (months.length > 0) {
+        monthEl.value = months[0];
+    }
+}
+
+function wireYearChange(yearEl, monthEl, state) {
+    if (!yearEl || !monthEl) return;
+    yearEl.addEventListener('change', () => {
+        const year = Number(yearEl.value);
+        const months = state.monthsByYear[year] || [];
+        setMonthOptions(monthEl, months, year);
+        if (months.length > 0) {
+            monthEl.value = months[0];
+        } else {
+            monthEl.value = '';
+        }
+    });
+}
+
+function populateReportFilters(state) {
+    REPORT_SELECT_PAIRS.forEach(({ yearId, monthId }) => {
+        const yearEl = document.getElementById(yearId);
+        const monthEl = document.getElementById(monthId);
+        setYearOptions(yearEl, state.years);
+        applyDefaultSelection(yearEl, monthEl, state);
+        wireYearChange(yearEl, monthEl, state);
+    });
+
+    REPORT_CLASS_SELECTS.forEach((id) => {
+        const select = document.getElementById(id);
+        setClassOptions(select, state.classes);
+    });
+}
+
+async function ensureReportFiltersReady() {
+    if (reportFilterState.readyPromise) {
+        return reportFilterState.readyPromise;
+    }
+
+    reportFilterState.readyPromise = (async () => {
+        const [monthsState, classes] = await Promise.all([
+            fetchAvailableMonths(),
+            fetchClasses()
+        ]);
+
+        reportFilterState.monthsByYear = monthsState.monthsByYear;
+        reportFilterState.years = monthsState.years;
+        reportFilterState.classes = classes;
+
+        if (!reportFilterState.years.length) {
+            alert('ยังไม่มีข้อมูลพฤติกรรมในปีการศึกษานี้');
+            return;
+        }
+
+        populateReportFilters(reportFilterState);
+    })();
+
+    return reportFilterState.readyPromise;
+}
+
 /**
  * สร้างรายงานพฤติกรรมประจำเดือน
  */
-function generateMonthlyReport() {
-    // แสดง Modal สำหรับเลือกเดือนและปี
+async function generateMonthlyReport() {
+    await ensureReportFiltersReady();
     const modal = new bootstrap.Modal(document.getElementById('monthlyReportModal'));
     modal.show();
 }
@@ -10,8 +201,8 @@ function generateMonthlyReport() {
 /**
  * สร้างรายงานสรุปนักเรียนที่มีความเสี่ยง
  */
-function generateRiskStudentsReport() {
-    // แสดง Modal สำหรับเลือกเดือนและปี
+async function generateRiskStudentsReport() {
+    await ensureReportFiltersReady();
     const modal = new bootstrap.Modal(document.getElementById('riskStudentsReportModal'));
     modal.show();
 }
@@ -19,8 +210,8 @@ function generateRiskStudentsReport() {
 /**
  * สร้างรายงานข้อมูลพฤติกรรมทั้งหมด
  */
-function generateAllBehaviorDataReport() {
-    // แสดง Modal สำหรับเลือกเดือนและปี
+async function generateAllBehaviorDataReport() {
+    await ensureReportFiltersReady();
     const modal = new bootstrap.Modal(document.getElementById('allBehaviorDataReportModal'));
     modal.show();
 }
@@ -113,30 +304,9 @@ function downloadAllBehaviorDataReport() {
     modal.hide();
 }
 
-// เตรียม Modal เมื่อ Document โหลดเสร็จ
+// เตรียม filter เมื่อ Document โหลดเสร็จ
 document.addEventListener('DOMContentLoaded', function() {
-    // ตั้งค่าเริ่มต้นสำหรับเดือนและปี
-    const now = new Date();
-    if (document.getElementById('report_month')) {
-        document.getElementById('report_month').value = now.getMonth() + 1; // JavaScript เดือน 0-11
-    }
-    if (document.getElementById('report_year')) {
-        document.getElementById('report_year').value = now.getFullYear();
-    }
-    
-    // ตั้งค่าเริ่มต้นสำหรับรายงานความเสี่ยง
-    if (document.getElementById('risk_report_month')) {
-        document.getElementById('risk_report_month').value = now.getMonth() + 1;
-    }
-    if (document.getElementById('risk_report_year')) {
-        document.getElementById('risk_report_year').value = now.getFullYear();
-    }
-    
-    // ตั้งค่าเริ่มต้นสำหรับรายงานข้อมูลพฤติกรรมทั้งหมด
-    if (document.getElementById('all_data_report_month')) {
-        document.getElementById('all_data_report_month').value = now.getMonth() + 1;
-    }
-    if (document.getElementById('all_data_report_year')) {
-        document.getElementById('all_data_report_year').value = now.getFullYear();
-    }
+    ensureReportFiltersReady().catch((err) => {
+        console.error(err);
+    });
 });

@@ -129,6 +129,11 @@ Route::prefix('api')->middleware('auth')->group(function () {
     Route::get('/laravel-log', [DashboardController::class, 'getLaravelLog'])->name('api.dashboard.laravel-log');
     });
 
+    // Report filters
+    Route::prefix('reports')->group(function () {
+        Route::get('/available-months', [App\Http\Controllers\ReportController::class, 'availableMonths']);
+    });
+
     // Student status sync removed (legacy functionality)
     
     // เพิ่มบรรทัดนี้
