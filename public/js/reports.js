@@ -25,10 +25,20 @@ const REPORT_CLASS_SELECTS = [
     'all_data_report_class_id'
 ];
 
+const REPORT_LEVEL_SELECTS = [
+    'report_level'
+];
+
+const REPORT_ACADEMIC_YEAR_SELECTS = [
+    'report_academic_year'
+];
+
 const reportFilterState = {
     monthsByYear: {},
     years: [],
     classes: [],
+    levels: [],
+    academicYears: [],
     readyPromise: null
 };
 
@@ -64,7 +74,9 @@ async function fetchAvailableMonths() {
         monthsByYear[year] = monthsByYear[year].sort((a, b) => b - a);
     });
 
-    return { monthsByYear, years };
+    const levels = payload.data?.levels || [];
+    const academicYears = payload.data?.academic_years || [];
+    return { monthsByYear, years, levels, academicYears };
 }
 
 /**
@@ -82,6 +94,38 @@ async function fetchClasses() {
         throw new Error(payload.message || 'ไม่สามารถดึงข้อมูลชั้นเรียนได้');
     }
     return payload.data || [];
+}
+
+function setLevelOptions(selectEl, levels) {
+    if (!selectEl) return;
+    selectEl.innerHTML = '';
+    const allOpt = document.createElement('option');
+    allOpt.value = '';
+    allOpt.textContent = 'ทุกระดับชั้น';
+    selectEl.appendChild(allOpt);
+
+    levels.forEach((level) => {
+        const option = document.createElement('option');
+        option.value = level;
+        option.textContent = level;
+        selectEl.appendChild(option);
+    });
+}
+
+function setAcademicYearOptions(selectEl, academicYears) {
+    if (!selectEl) return;
+    selectEl.innerHTML = '';
+    const allOpt = document.createElement('option');
+    allOpt.value = '';
+    allOpt.textContent = 'ทุกปีการศึกษา';
+    selectEl.appendChild(allOpt);
+
+    academicYears.forEach(({ be }) => {
+        const option = document.createElement('option');
+        option.value = be; // ส่งค่าพ.ศ. ให้ backend แปลงเอง
+        option.textContent = be;
+        selectEl.appendChild(option);
+    });
 }
 
 function setYearOptions(yearSelect, years) {
@@ -161,6 +205,16 @@ function populateReportFilters(state) {
         const select = document.getElementById(id);
         setClassOptions(select, state.classes);
     });
+
+    REPORT_LEVEL_SELECTS.forEach((id) => {
+        const select = document.getElementById(id);
+        setLevelOptions(select, state.levels);
+    });
+
+    REPORT_ACADEMIC_YEAR_SELECTS.forEach((id) => {
+        const select = document.getElementById(id);
+        setAcademicYearOptions(select, state.academicYears);
+    });
 }
 
 async function ensureReportFiltersReady() {
@@ -177,6 +231,8 @@ async function ensureReportFiltersReady() {
         reportFilterState.monthsByYear = monthsState.monthsByYear;
         reportFilterState.years = monthsState.years;
         reportFilterState.classes = classes;
+        reportFilterState.levels = monthsState.levels;
+        reportFilterState.academicYears = monthsState.academicYears;
 
         if (!reportFilterState.years.length) {
             alert('ยังไม่มีข้อมูลพฤติกรรมในปีการศึกษานี้');
@@ -223,6 +279,8 @@ function downloadMonthlyReport() {
     const month = document.getElementById('report_month').value;
     const year = document.getElementById('report_year').value;
     const classId = document.getElementById('report_class_id').value;
+    const level = document.getElementById('report_level')?.value || '';
+    const academicYear = document.getElementById('report_academic_year')?.value || '';
     
     // ตรวจสอบความถูกต้องของข้อมูล
     if (!month || !year) {
@@ -234,6 +292,12 @@ function downloadMonthlyReport() {
     let url = `/reports/monthly?month=${month}&year=${year}`;
     if (classId) {
         url += `&class_id=${classId}`;
+    }
+    if (level) {
+        url += `&level=${encodeURIComponent(level)}`;
+    }
+    if (academicYear) {
+        url += `&academic_year=${academicYear}`;
     }
     
     // เปิด URL ใหม่เพื่อดาวน์โหลด (หรือเปิดในแท็บใหม่)

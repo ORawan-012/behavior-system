@@ -24,6 +24,8 @@ class ReportController extends Controller
         $month = $request->input('month', Carbon::now()->month);
         $year = $request->input('year', Carbon::now()->year);
         $classId = $request->input('class_id');
+        $level = $request->input('level');
+        $academicYear = $request->input('academic_year'); // พ.ศ.
         
         // สร้างวันแรกและวันสุดท้ายของเดือน
         $startDate = Carbon::createFromDate($year, $month, 1)->startOfMonth();
@@ -43,16 +45,25 @@ class ReportController extends Controller
         
         if ($classId) {
             $query->where('class_id', $classId);
+        } elseif ($level) {
+            $query->whereHas('classroom', function ($q) use ($level) {
+                $q->where('classes_level', $level);
+            });
+        }
+
+        if ($academicYear) {
+            $prefix = sprintf('%02d', ((int) $academicYear) % 100);
+            $query->where('students_student_code', 'LIKE', $prefix . '%');
         }
         
         $students = $query->get();
         
-        // เรียงลำดับนักเรียนตามชั้นเรียนและรหัสนักเรียน
-        $students = $students->sortBy(function($student) {
-            return [$student->classroom ? $student->classroom->classes_level : 'zzz',
-                    $student->classroom ? $student->classroom->classes_room_number : 'zzz',
-                    $student->students_student_code];
-        });
+        // เรียงลำดับตามรหัสนักเรียน (ต้องการรวมทุกห้องในระดับชั้นเดียวกัน) และรีเซ็ต index
+        $students = $students
+            ->sortBy(function ($student) {
+                return (int) $student->students_student_code;
+            })
+            ->values();
         
         // คำนวณคะแนนพฤติกรรมประจำเดือน
         foreach ($students as $student) {
@@ -456,6 +467,32 @@ class ReportController extends Controller
                     ];
                 });
 
+            // ดึงระดับชั้นที่มีนักเรียน (ใช้สำหรับรวมทุกห้องในระดับเดียวกัน)
+            $levels = Classroom::has('students')
+                ->select('classes_level')
+                ->distinct()
+                ->orderByRaw("FIELD(classes_level, 'ม.1','ม.2','ม.3','ม.4','ม.5','ม.6')")
+                ->get()
+                ->pluck('classes_level')
+                ->values();
+
+            // ดึงปีการศึกษาจากรหัสนักเรียน (สองหลักแรก) แล้วแปลงเป็น พ.ศ.
+            $academicYears = Student::query()
+                ->whereNotNull('students_student_code')
+                ->selectRaw('LEFT(students_student_code, 2) as code_prefix')
+                ->groupBy('code_prefix')
+                ->orderByDesc('code_prefix')
+                ->get()
+                ->map(function ($row) {
+                    $prefix = (int) $row->code_prefix; // เช่น 65
+                    $be = 2500 + $prefix; // 65 -> 2565
+                    return [
+                        'be' => $be,
+                        'ad' => $be - 543,
+                        'code_prefix' => sprintf('%02d', $prefix),
+                    ];
+                });
+
             return response()->json([
                 'success' => true,
                 'message' => 'ดึงข้อมูลเดือนที่มีรายงานสำเร็จ',
@@ -465,6 +502,8 @@ class ReportController extends Controller
                     'start_date' => $startDate->toDateString(),
                     'end_date' => $endDate->toDateString(),
                     'months' => $availableMonths,
+                    'levels' => $levels,
+                    'academic_years' => $academicYears,
                 ],
             ]);
         } catch (\Exception $e) {

@@ -3217,6 +3217,21 @@ document.addEventListener('DOMContentLoaded', function () {
                                 </select>
                             </div>
                             <div class="col-md-6">
+                                <label for="report_level" class="form-label">ระดับชั้น (รวมทุกห้อง)</label>
+                                <select class="form-select" id="report_level">
+                                    <option value="">ทุกระดับชั้น</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="report_academic_year" class="form-label">ปีการศึกษา (จากรหัสนักเรียน)</label>
+                                <select class="form-select" id="report_academic_year">
+                                    <option value="">ทุกปีการศึกษา</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
                                 <label for="report_year" class="form-label">ปี (พ.ศ.)</label>
                                 <select class="form-select" id="report_year" required>
                                     @for($y = date('Y') + 543; $y >= date('Y') + 540; $y--)
