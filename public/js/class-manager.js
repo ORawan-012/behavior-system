@@ -173,9 +173,11 @@
       if(!dStudentsBody) return;
         // กรองตามบทบาท: ถ้าไม่ใช่ admin ให้แสดงเฉพาะ active หรือ suspended
         var role = (window.authRole || '').toLowerCase();
-        var visible = (role === 'admin') ? items : items.filter(function(st){
-          return ['active','suspended'].includes((st.students_status||'').toLowerCase());
-        });
+        var visible = (role === 'admin')
+          ? items.filter(function(st){ return (st.students_status||'').toLowerCase() !== 'graduate'; })
+          : items.filter(function(st){
+              return ['active','suspended'].includes((st.students_status||'').toLowerCase());
+            });
         if(!visible.length){ dStudentsBody.innerHTML='<tr><td colspan="6" class="text-center text-muted py-4">ไม่มีนักเรียน</td></tr>'; return; }
         var statusLabels = {
           'active': 'กำลังศึกษา',
@@ -183,6 +185,12 @@
           'expelled': 'พ้นสภาพ/ลาออก',
           'transferred': 'ย้ายสถานศึกษา',
           'graduate': 'จบการศึกษา'
+        };
+        var statusStyles = {
+          'suspended': { badge: 'bg-warning text-dark', text: 'text-warning fw-semibold' },
+          'expelled': { badge: 'bg-danger', text: 'text-danger fw-semibold' },
+          'transferred': { badge: 'bg-info text-dark', text: 'text-info fw-semibold' },
+          'graduate': { badge: 'bg-success', text: 'text-success fw-semibold' }
         };
         dStudentsBody.innerHTML = visible.map(function(st,idx){
           var code=escapeHtml(st.students_student_code||'-');
@@ -192,9 +200,10 @@
           var studentId = st.students_id || st.id;
           var status=(st.students_status||'').toLowerCase();
           var nameHtml = first + ' ' + last;
-          // ถ้าเป็น admin และสถานะไม่ใช่ active หรือ suspended ให้ไฮไลท์เป็นสีแดงและโชว์ badge สถานะ
-          if(role === 'admin' && !['active','suspended'].includes(status)){
-            nameHtml = '<span class="text-danger fw-semibold">'+nameHtml+'</span> <span class="badge bg-danger ms-1">'+(statusLabels[status]||status)+'</span>';
+          // ถ้าเป็น admin: แยกสีตามสถานะ (ยกเว้น active ปล่อยไว้)
+          if(role === 'admin' && status !== 'active'){
+            var style = statusStyles[status] || { badge: 'bg-secondary', text: 'text-secondary fw-semibold' };
+            nameHtml = '<span class="'+style.text+'">'+nameHtml+'</span> <span class="badge '+style.badge+' ms-1">'+(statusLabels[status]||status)+'</span>';
           }
           return '<tr>\
             <td>'+ (idx+1) +'</td>\
